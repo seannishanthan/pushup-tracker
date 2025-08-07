@@ -20,8 +20,8 @@ const authenticateToken = async (req, res, next) => {
         // verify jwt token with our secret key that user sent to server through a request header
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // fetch user from database using decoded user id
-        const user = await User.findById(decoded.userId).select('-password'); // exclude password field
+        // fetch user from database using decoded user id and exclude password field
+        const user = await User.findById(decoded.userId).select('-password');
 
         if (!user) {
             return res.status(401).json({

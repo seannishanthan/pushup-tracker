@@ -147,7 +147,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
     try {
         res.json({
             success: true,
-            user: req.user // Get public profile with password
+            user: req.user // Get public profile (password excluded for security)
         });
 
 
