@@ -24,6 +24,7 @@ api.interceptors.request.use(config => {
 export const authAPI = {
     register: (userData) => api.post('/auth/register', userData),
     login: (userData) => api.post('/auth/login', userData),
+    getProfile: () => api.get('/auth/profile'), // Add this to fetch user profile from react frontend (user cant enter this in browser to access data)
 };
 
 export default api;
