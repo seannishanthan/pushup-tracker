@@ -57,12 +57,11 @@ router.post('/register', async (req, res) => {
 
         const token = generateToken(user._id);
 
-        // Return success response with token and user data (excluding password)
+        // Return success response with token only
         res.status(201).json({
             success: true,
             message: 'Account created successfully!',
-            token,
-            user: user.getPublicProfile()
+            token
         });
 
 
@@ -123,12 +122,11 @@ router.post('/login', async (req, res) => {
 
         const token = generateToken(user._id);
 
-        // Return token and user data (excluding password)
+        // Return token only
         res.status(200).json({
             success: true,
             message: 'Login successful',
-            token,
-            user: user.getPublicProfile()
+            token
         });
 
     } catch (error) {

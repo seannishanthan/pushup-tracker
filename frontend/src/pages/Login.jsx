@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useAuthManager } from '../hooks/useAuthManager';
 import { authAPI } from '../utils/api';
 
 function Login() {
-    const navigate = useNavigate(); // A react hook that allows us to navigate to Dashboard upon successful login 
+    const { login } = useAuthManager();
 
     // when state variables are changed, the component will re-render on UI with the new values
 
@@ -28,12 +29,11 @@ function Login() {
             const response = await authAPI.login(formData); //send login request to backend (async function)
 
             //response is a JSON object with data obj (wrapping user, token, message, success by axios)
-            localStorage.setItem('token', response.data.token);
-            localStorage.setItem('user', JSON.stringify(response.data.user)); // store user without password in localStorage
             
-            // Navigate to dashboard after successful login
+            // Use the auth manager login method - only pass the token
+            login(response.data.token);
+            
             console.log('Login successful!', response.data);
-            navigate('/dashboard');
         } catch (error) {
             console.error('Login error:', error);
             setError(error.response?.data?.message || 'Login failed'); // ? syntax allows safe access to nested properties if they are null

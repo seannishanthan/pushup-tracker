@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useAuthManager } from '../hooks/useAuthManager';
 import { authAPI } from '../utils/api';
 
 
 function Register() {
-  const navigate = useNavigate();
+  const { login } = useAuthManager();
   
   const [formData, setFormData] = useState({
     username: '',
@@ -24,12 +25,10 @@ function Register() {
       const response = await authAPI.register(formData);
       console.log('Registration response:', response);
       
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      // Use the auth manager login method after successful registration - only pass the token
+      login(response.data.token);
             
-      // Navigate to dashboard after successful registration
       console.log('Registration successful!', response.data);
-      navigate('/dashboard');
     } catch (error) {
       console.error('Registration error:', error);
       setError(error.response?.data?.message || 'Registration failed');

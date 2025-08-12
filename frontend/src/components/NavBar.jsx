@@ -1,16 +1,17 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useAuthManager } from '../hooks/useAuthManager';
 
 function NavBar() {
-    const navigate = useNavigate();
+    const { logout, isAuthenticated } = useAuthManager();
 
     const handleLogout = () => {
-        // Clear stored user data
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-
-        // Navigate back to login
-        navigate('/login');
+        logout(); // This will handle history replacement
     };
+
+    // Don't show navbar if user is not authenticated
+    if (!isAuthenticated()) {
+        return null;
+    }
 
     return (
         <nav className="bg-blue-600 shadow-lg">
