@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const connectDB = require('./config/database');
 
 const authRoutes = require('./routes/auth');
+const pushupRoutes = require('./routes/pushups');
 
 const app = express();
 
@@ -30,6 +31,7 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 app.use('/api/auth', authRoutes);
+app.use('/api/pushups', pushupRoutes);
 
 
 // Test route
