@@ -20,11 +20,69 @@ api.interceptors.request.use(config => {
     return config;
 });
 
-// export api instance with methods for authentication that the frontend can use to make requests to call the backend API
+// Response interceptor for error handling
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        // Handle authentication errors
+        if (error.response?.status === 401) {
+            // Clear invalid token
+            localStorage.removeItem('token');
+            
+            // Redirect to login if not already there
+            if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
+// Authentication API
 export const authAPI = {
     register: (userData) => api.post('/auth/register', userData),
     login: (userData) => api.post('/auth/login', userData),
     getProfile: () => api.get('/auth/profile'), // Add this to fetch user profile from react frontend (user cant enter this in browser to access data)
+};
+
+// Pushup Sessions API
+export const pushupAPI = {
+    // Create a new pushup session
+    create: (sessionData) => {
+        return api.post('/pushups', sessionData);
+    },
+
+    // List pushup sessions with pagination
+    list: ({ limit = 10, page = 1, ...filters } = {}) => {
+        const params = {
+            limit,
+            page,
+            ...filters,
+        };
+        return api.get('/pushups', { params });
+    },
+
+    // Get user statistics
+    stats: (dailyGoal = 100) => {
+        return api.get('/pushups/stats', { 
+            params: { dailyGoal } 
+        });
+    },
+
+    // Get specific pushup session
+    getById: (sessionId) => {
+        return api.get(`/pushups/${sessionId}`);
+    },
+
+    // Update pushup session (partial updates supported)
+    update: (sessionId, updateData) => {
+        return api.put(`/pushups/${sessionId}`, updateData);
+    },
+
+    // Delete pushup session
+    delete: (sessionId) => {
+        return api.delete(`/pushups/${sessionId}`);
+    },
 };
 
 export default api;

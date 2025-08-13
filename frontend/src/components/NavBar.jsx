@@ -20,7 +20,7 @@ function NavBar() {
 
                     {/* Logo/Brand */}
                     <div className="flex items-center">
-                        <Link to="/dashboard" className="text-white text-xl font-bold">
+                        <Link to="/" className="text-white text-xl font-bold">
                             💪 Pushup Tracker
                         </Link>
                     </div>

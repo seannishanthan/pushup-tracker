@@ -28,14 +28,14 @@ export function useAuthManager() {
         const authenticated = isAuthenticated();
 
         // If user is on login/register page but authenticated, replace history with dashboard
-        if ((location.pathname === '/login' || location.pathname === '/register' || location.pathname === '/') && authenticated) {
-            window.history.replaceState(null, '', '/dashboard');
-            window.location.replace('/dashboard');
+        if ((location.pathname === '/login' || location.pathname === '/register') && authenticated) {
+            window.history.replaceState(null, '', '/');
+            window.location.replace('/');
             return;
         }
 
         // If user is on dashboard but not authenticated, replace history with login
-        if (location.pathname === '/dashboard' && !authenticated) {
+        if (location.pathname === '/' && !authenticated) {
             localStorage.removeItem('token');
             window.history.replaceState(null, '', '/login');
             window.location.replace('/login');
@@ -44,10 +44,10 @@ export function useAuthManager() {
     }, [location.pathname]);
 
     // Disable back button for authenticated users on dashboard
-    // Whenever url changes, if user is on dashboard and authenticated we push /dashboard to history
+    // Whenever url changes, if user is on dashboard and authenticated we push / to history
     // This ensures that if they try to go back, they stay on the dashboard
     useEffect(() => {
-        if (location.pathname === '/dashboard' && isAuthenticated()) {
+        if (location.pathname === '/' && isAuthenticated()) {
             // Push state to prevent going back
             window.history.pushState(null, '', location.pathname);
 
@@ -70,7 +70,7 @@ export function useAuthManager() {
     }, [location.pathname]);
 
     // Return object with methods to manage authentication state
-    // Use window.location.replace instead of navigate() for logout/login to prevent browser history of /dashboard being kept
+    // Use window.location.replace instead of navigate() for logout/login to prevent browser history of / being kept
     return {
         isAuthenticated,
         logout: () => {
@@ -82,8 +82,8 @@ export function useAuthManager() {
         login: (token) => {
             localStorage.setItem('token', token);
             // Replace entire history with dashboard
-            window.history.replaceState(null, '', '/dashboard');
-            window.location.replace('/dashboard');
+            window.history.replaceState(null, '', '/');
+            window.location.replace('/');
         }
     };
 }
