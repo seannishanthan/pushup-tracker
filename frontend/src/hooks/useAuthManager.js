@@ -34,8 +34,8 @@ export function useAuthManager() {
             return;
         }
 
-        // If user is on dashboard but not authenticated, replace history with login
-        if (location.pathname === '/' && !authenticated) {
+        // If user is on protected routes (dashboard or pushup session) and not authenticated, replace history with login
+        if ((location.pathname === '/' || location.pathname === '/session') && !authenticated) {
             localStorage.removeItem('token');
             window.history.replaceState(null, '', '/login');
             window.location.replace('/login');

@@ -3,6 +3,7 @@ import { useAuthManager } from './hooks/useAuthManager'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
 import Dashboard from './pages/Dashboard.jsx'
+import Session from './pages/Session.jsx'
 
 function AppContent() {
   useAuthManager(); // This handles all navigation logic
@@ -15,6 +16,12 @@ function AppContent() {
         path="/" 
         element={
             <Dashboard />
+        } 
+      />
+      <Route 
+        path="/session" 
+        element={
+            <Session />
         } 
       />
     </Routes>
