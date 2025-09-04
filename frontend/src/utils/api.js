@@ -28,7 +28,7 @@ api.interceptors.response.use(
         if (error.response?.status === 401) {
             // Clear invalid token
             localStorage.removeItem('token');
-            
+
             // Redirect to login if not already there
             if (window.location.pathname !== '/login') {
                 window.location.href = '/login';
@@ -43,6 +43,7 @@ export const authAPI = {
     register: (userData) => api.post('/auth/register', userData),
     login: (userData) => api.post('/auth/login', userData),
     getProfile: () => api.get('/auth/profile'), // Add this to fetch user profile from react frontend (user cant enter this in browser to access data)
+    updateDailyGoal: (dailyGoal) => api.put('/auth/profile/goal', { dailyGoal }), // Update user's daily goal
 };
 
 // Pushup Sessions API
@@ -64,8 +65,8 @@ export const pushupAPI = {
 
     // Get user statistics
     stats: (dailyGoal = 100) => {
-        return api.get('/pushups/stats', { 
-            params: { dailyGoal } 
+        return api.get('/pushups/stats', {
+            params: { dailyGoal }
         });
     },
 

@@ -158,4 +158,46 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 });
 
+// Route to update user's daily goal
+router.put('/profile/goal', authenticateToken, async (req, res) => {
+    try {
+        const { dailyGoal } = req.body;
+
+        // Validate the daily goal
+        if (!dailyGoal || isNaN(dailyGoal) || parseInt(dailyGoal) <= 0) {
+            return res.status(400).json({
+                message: 'Please provide a valid daily goal (positive number)',
+                success: false
+            });
+        }
+
+        // Update the user's daily goal
+        const updatedUser = await User.findByIdAndUpdate(
+            req.user.id,
+            { dailyGoal: parseInt(dailyGoal) },
+            { new: true } // Return the updated user
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({
+                message: 'User not found',
+                success: false
+            });
+        }
+
+        res.json({
+            success: true,
+            message: 'Daily goal updated successfully',
+            user: updatedUser.getPublicProfile()
+        });
+
+    } catch (error) {
+        console.error('Goal update error:', error);
+        res.status(500).json({
+            message: 'Server error while updating daily goal',
+            success: false
+        });
+    }
+});
+
 module.exports = router;

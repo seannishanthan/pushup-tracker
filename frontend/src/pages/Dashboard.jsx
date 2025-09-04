@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import NavBar from "../components/NavBar";
-import { authAPI } from '../utils/api';
+import { authAPI, pushupAPI } from '../utils/api';
 
 // Sample data variations - in real app, this would come from your API/state management
 const sampleDataExisting = {
@@ -202,25 +202,24 @@ const ProgressBar = ({ current, goal, onEditGoal }) => {
 };
 
 // Chart component
-const WeeklyChart = ({ data }) => {
+const WeeklyChart = ({ data, labels }) => {
   const max = Math.max(...data) || 1;
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
     <div>
       <h3 className="mb-4 text-gray-900 font-semibold">7-Day Activity</h3>
-      <div className="flex items-end gap-2 px-4 mb-2" style={{ height: '200px' }}>
+      <div className="flex items-end gap-2 px-4 mb-2" style={{ height: '120px' }}>
         {data.map((value, index) => (
           <div
             key={index}
-            className="flex-1 bg-gradient-to-t from-blue-500 to-blue-400 rounded-t hover:from-blue-700 hover:to-blue-500 transition-all duration-200 cursor-pointer min-h-5"
+            className="flex-1 bg-gradient-to-t from-blue-500 to-blue-400 rounded-t hover:from-blue-700 hover:to-blue-500 transition-all duration-200 cursor-pointer min-h-1"
             style={{ height: `${(value / max) * 100}%` }}
-            title={`${days[index]}: ${value} reps`}
+            title={`${labels[index]}: ${value} reps`}
           ></div>
         ))}
       </div>
       <div className="flex gap-2 px-4 mt-2">
-        {days.map((day, index) => (
+        {labels.map((day, index) => (
           <div key={index} className="flex-1 text-center text-xs text-gray-500">{day}</div>
         ))}
       </div>
@@ -231,7 +230,112 @@ const WeeklyChart = ({ data }) => {
 function Dashboard() {
   const [data, setData] = useState(sampleData);
   const [userName, setUserName] = useState('User'); // State for real user name
+  const [todayReps, setTodayReps] = useState(0); // State for real today's reps
+  const [todayRepsData, setTodayRepsData] = useState([]); // State for sparkline data
+  const [allTimeReps, setAllTimeReps] = useState(0); // State for real all-time reps
+  const [allTimeRepsData, setAllTimeRepsData] = useState([]); // State for all-time sparkline
+  const [bestDay, setBestDay] = useState(0); // State for real best day reps
+  const [bestDayData, setBestDayData] = useState([]); // State for best day sparkline
+  const [appearanceStreak, setAppearanceStreak] = useState(0); // State for real appearance streak
+  const [appearanceStreakData, setAppearanceStreakData] = useState([]); // State for streak sparkline
+  const [appearanceStreakColor, setAppearanceStreakColor] = useState('red'); // State for appearance streak message color
+  const [avgPerSession, setAvgPerSession] = useState(0); // State for real average per session
+  const [avgPerSessionData, setAvgPerSessionData] = useState([]); // State for avg/session sparkline
+  const [recentSessions, setRecentSessions] = useState([]); // State for real recent sessions
+  const [allSessions, setAllSessions] = useState([]); // State for all sessions data
+  const [dailyGoal, setDailyGoal] = useState(null); // State for real daily goal - null until loaded from DB
+  const [weeklyChartData, setWeeklyChartData] = useState([]); // State for real 7-day activity data
+  const [weeklyChartLabels, setWeeklyChartLabels] = useState([]); // State for dynamic day labels
+  const [last7DaysReps, setLast7DaysReps] = useState(0); // State for total reps in last 7 days
+  const [avgRepsPerDay, setAvgRepsPerDay] = useState(0); // State for average reps per day in last 7 days
+  const [sessionsLast7Days, setSessionsLast7Days] = useState(0); // State for sessions in last 7 days
+  const [goalStreak, setGoalStreak] = useState(0); // State for real goal streak
+  const [goalStreakData, setGoalStreakData] = useState(''); // State for goal streak message
+  const [goalStreakColor, setGoalStreakColor] = useState('green'); // State for goal streak message color
   const [currentDate, setCurrentDate] = useState('');
+
+  // Helper function to get color classes based on streak color
+  const getStreakColorClasses = (color) => {
+    switch (color) {
+      case 'green':
+        return 'text-green-500 bg-green-50';
+      case 'orange':
+        return 'text-orange-500 bg-orange-50';
+      case 'red':
+        return 'text-red-500 bg-red-50';
+      default:
+        return 'text-gray-500 bg-gray-50';
+    }
+  };
+
+  // Function to calculate goal streak
+  const calculateGoalStreak = (sessions, goalValue) => {
+    if (!sessions || sessions.length === 0 || !goalValue) {
+      setGoalStreak(0);
+      setGoalStreakData('Start your goal streak!');
+      setGoalStreakColor('red');
+      return;
+    }
+
+    // Group sessions by date to get daily totals
+    const dailyTotalsForGoal = {};
+    sessions.forEach(session => {
+      const sessionDate = new Date(session.startedAt).toISOString().split('T')[0];
+      if (!dailyTotalsForGoal[sessionDate]) {
+        dailyTotalsForGoal[sessionDate] = 0;
+      }
+      dailyTotalsForGoal[sessionDate] += session.count;
+    });
+
+    // Get today's date and check if user met goal today
+    const todayGoalDate = new Date();
+    const todayGoalDateString = todayGoalDate.toISOString().split('T')[0];
+    const todayGoalReps = dailyTotalsForGoal[todayGoalDateString] || 0;
+    const metGoalToday = todayGoalReps >= goalValue;
+
+    // Calculate goal streak by going backwards from today (or yesterday if goal not met today)
+    let currentGoalStreak = 0;
+    let startGoalDay = metGoalToday ? 0 : 1; // Start from yesterday if goal not met today
+
+    // Check each day going backwards
+    for (let i = startGoalDay; i < 365; i++) { // Max check 365 days back
+      const checkGoalDate = new Date(todayGoalDate);
+      checkGoalDate.setDate(checkGoalDate.getDate() - i);
+      const dateGoalString = checkGoalDate.toISOString().split('T')[0];
+
+      const dayReps = dailyTotalsForGoal[dateGoalString] || 0;
+      const metGoalThisDay = dayReps >= goalValue;
+
+      if (metGoalThisDay) {
+        currentGoalStreak++;
+      } else {
+        break; // Break streak if goal not met
+      }
+    }
+
+    setGoalStreak(currentGoalStreak);
+
+    // Create goal streak message and color
+    let goalStreakMessage = '';
+    let goalStreakColor = '';
+    if (metGoalToday) {
+      goalStreakMessage = 'Goal achieved today!';
+      goalStreakColor = 'green'; // Green for achieved goal
+    } else if (currentGoalStreak > 0) {
+      const remaining = goalValue - todayGoalReps;
+      goalStreakMessage = `${remaining} more to keep streak!`;
+      goalStreakColor = 'orange'; // Orange for need to keep streak
+    } else {
+      goalStreakMessage = 'Start your goal streak!';
+      goalStreakColor = 'red'; // Red for no streak
+    }
+    setGoalStreakData(goalStreakMessage);
+    setGoalStreakColor(goalStreakColor);
+
+    console.log('Goal streak recalculated with goal:', goalValue);
+    console.log('Current goal streak:', currentGoalStreak);
+    console.log('Goal streak message:', goalStreakMessage);
+  };
 
   useEffect(() => {
     // Set current date
@@ -244,7 +348,7 @@ function Dashboard() {
     };
     setCurrentDate(today.toLocaleDateString('en-US', options));
 
-    // Fetch only the user name from API
+    // Fetch the user name and daily goal from API
     const fetchUserName = async () => {
       try {
         const userResponse = await authAPI.getProfile();
@@ -260,25 +364,358 @@ function Dashboard() {
         if (name) {
           setUserName(name);
         }
+
+        // Get daily goal from user profile
+        if (userResponse?.data?.user?.dailyGoal) {
+          setDailyGoal(userResponse.data.user.dailyGoal);
+        } else {
+          // If user doesn't have a daily goal set, use default and save it
+          setDailyGoal(20);
+        }
       } catch (err) {
         console.error('Error fetching user name:', err);
         // Keep default 'User' if API call fails
       }
     };
 
-    fetchUserName();
+    // Fetch today's reps from user sessions
+    const fetchTodayReps = async () => {
+      try {
+        // Get user profile first to get the daily goal
+        const userResponse = await authAPI.getProfile();
+        const userDailyGoal = userResponse?.data?.user?.dailyGoal || 20;
+
+        const sessionsResponse = await pushupAPI.list();
+        console.log('Raw API response:', sessionsResponse);
+
+        // The correct path is sessionsResponse.data.data.sessions
+        const sessions = sessionsResponse.data.data.sessions || [];
+
+        console.log('All sessions from API:', sessions);
+
+        // Store all sessions in state for goal streak recalculation
+        setAllSessions(sessions);
+
+        // Calculate ALL-TIME total reps
+        const totalAllTimeReps = sessions.reduce((sum, session) => sum + session.count, 0);
+        setAllTimeReps(totalAllTimeReps);
+
+        // Calculate all-time sparkline data (last 30 days for better trend)
+        const last30Days = [];
+        let cumulativeTotal = 0;
+
+        // Sort sessions by date to build cumulative total over time
+        const sortedSessions = [...sessions].sort((a, b) => new Date(a.startedAt) - new Date(b.startedAt));
+
+        for (let i = 29; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const dateString = date.toISOString().split('T')[0];
+
+          // Find sessions up to this date for cumulative total
+          const sessionsUpToDate = sortedSessions.filter(session => {
+            const sessionDate = new Date(session.startedAt).toISOString().split('T')[0];
+            return sessionDate <= dateString;
+          });
+
+          cumulativeTotal = sessionsUpToDate.reduce((sum, session) => sum + session.count, 0);
+          last30Days.push(cumulativeTotal);
+        }
+
+        setAllTimeRepsData(last30Days);
+
+        // Calculate BEST DAY (highest daily total, not single session)
+        // Group sessions by date and find the date with highest total
+        const dailyTotals = {};
+
+        sessions.forEach(session => {
+          const sessionDate = new Date(session.startedAt).toISOString().split('T')[0];
+          if (!dailyTotals[sessionDate]) {
+            dailyTotals[sessionDate] = 0;
+          }
+          dailyTotals[sessionDate] += session.count;
+        });
+
+        // Find the day with the highest total
+        const bestDayTotal = Math.max(...Object.values(dailyTotals), 0);
+        const bestDayDate = Object.keys(dailyTotals).find(date => dailyTotals[date] === bestDayTotal);
+
+        setBestDay(bestDayTotal);
+
+        // Calculate best day sparkline data (show daily totals progression)
+        const dailyTotalsArray = [];
+
+        // Sort dates and show progression of daily totals
+        const sortedDates = Object.keys(dailyTotals).sort();
+        sortedDates.forEach(date => {
+          dailyTotalsArray.push(dailyTotals[date]);
+        });
+
+        // Take last 10 daily totals for sparkline (or pad with zeros if less than 10 days)
+        const last10DailyTotals = dailyTotalsArray.length >= 10
+          ? dailyTotalsArray.slice(-10)
+          : [...Array(10 - dailyTotalsArray.length).fill(0), ...dailyTotalsArray];
+
+        setBestDayData(last10DailyTotals);
+
+        // Calculate APPEARANCE STREAK (consecutive days with at least 1 session)
+        // Create array of dates with sessions
+        const datesWithSessions = new Set(
+          sessions.map(session => new Date(session.startedAt).toISOString().split('T')[0])
+        );
+
+        // Get today's date in YYYY-MM-DD format
+        const todayDate = new Date();
+        const todayDateString = todayDate.toISOString().split('T')[0];
+        const hasSessionToday = datesWithSessions.has(todayDateString);
+
+        // Calculate current streak
+        let currentStreak = 0;
+        let startDay = hasSessionToday ? 0 : 1; // Start from yesterday if no session today
+
+        // Check each day going backwards from today (or yesterday if no session today)
+        for (let i = startDay; i < 365; i++) { // Max check 365 days back
+          const checkDate = new Date(todayDate);
+          checkDate.setDate(checkDate.getDate() - i);
+          const dateString = checkDate.toISOString().split('T')[0];
+
+          if (datesWithSessions.has(dateString)) {
+            currentStreak++;
+          } else {
+            // Break streak if we find a day without sessions
+            break;
+          }
+        }
+
+        setAppearanceStreak(currentStreak);
+
+        // Create streak message and color
+        let streakMessage = '';
+        let streakColor = '';
+        if (hasSessionToday) {
+          streakMessage = 'Great work!';
+          streakColor = 'green'; // Green for completed session today
+        } else if (currentStreak > 0) {
+          streakMessage = 'Log session to keep streak';
+          streakColor = 'orange'; // Orange for active streak but no session today
+        } else {
+          streakMessage = 'Log session to start streak';
+          streakColor = 'red'; // Red for no streak
+        }
+        setAppearanceStreakData(streakMessage); // Store message instead of sparkline data
+        setAppearanceStreakColor(streakColor);
+
+        console.log('Dates with sessions:', Array.from(datesWithSessions));
+        console.log('Today date string:', todayDateString);
+        console.log('Has session today:', hasSessionToday);
+        console.log('Current appearance streak:', currentStreak);
+        console.log('Streak message:', streakMessage);
+
+        // Calculate AVERAGE PER SESSION
+        const totalSessions = sessions.length;
+        const avgPerSessionValue = totalSessions > 0 ? Math.round(totalAllTimeReps / totalSessions) : 0;
+        setAvgPerSession(avgPerSessionValue);
+
+        // Calculate last 30 days avg per session progression for sparkline
+        const avgPerSessionHistory = [];
+        for (let i = 29; i >= 0; i--) {
+          const endDate = new Date();
+          endDate.setDate(endDate.getDate() - i);
+
+          // Get all sessions up to this date
+          const sessionsUpToDate = sessions.filter(session => {
+            const sessionDate = new Date(session.startedAt);
+            return sessionDate <= endDate;
+          });
+
+          if (sessionsUpToDate.length > 0) {
+            const totalRepsUpToDate = sessionsUpToDate.reduce((sum, session) => sum + session.count, 0);
+            const avgUpToDate = Math.round(totalRepsUpToDate / sessionsUpToDate.length);
+            avgPerSessionHistory.push(avgUpToDate);
+          } else {
+            avgPerSessionHistory.push(0);
+          }
+        }
+        setAvgPerSessionData(avgPerSessionHistory);
+
+        console.log('Total sessions:', totalSessions);
+        console.log('Average per session:', avgPerSessionValue);
+        console.log('Avg per session history:', avgPerSessionHistory);
+
+        // Calculate RECENT SESSIONS (last 5 sessions, sorted by most recent)
+        const recentSortedSessions = [...sessions].sort((a, b) =>
+          new Date(b.startedAt) - new Date(a.startedAt)
+        );
+        const recentSessionsData = recentSortedSessions.slice(0, 5).map(session => {
+          const sessionDate = new Date(session.startedAt);
+          const now = new Date();
+
+          // Format date
+          let dateString;
+          const diffTime = Math.abs(now - sessionDate);
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+          if (diffDays === 0) {
+            dateString = `Today, ${sessionDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+          } else if (diffDays === 1) {
+            dateString = `Yesterday, ${sessionDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+          } else {
+            dateString = `${sessionDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${sessionDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+          }
+
+          // Calculate duration (assuming session has duration or we calculate from start/end)
+          const duration = session.duration || '2min 30sec'; // Use session duration if available, otherwise default
+
+          return {
+            id: session._id,
+            date: dateString,
+            duration: duration,
+            reps: session.count
+          };
+        });
+
+        setRecentSessions(recentSessionsData);
+        console.log('Recent sessions:', recentSessionsData);
+
+        // Calculate WEEKLY CHART DATA (last 7 days ending on today)
+        const weeklyData = [];
+        const weeklyLabels = [];
+
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const dateString = date.toISOString().split('T')[0];
+
+          // Get day label (Mon, Tue, etc.)
+          const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short' });
+          weeklyLabels.push(dayLabel);
+
+          // Filter sessions for this specific day
+          const daysSessions = sessions.filter(session => {
+            const sessionDate = new Date(session.startedAt).toISOString().split('T')[0];
+            return sessionDate === dateString;
+          });
+
+          // Sum up total reps for this day
+          const dayTotal = daysSessions.reduce((sum, session) => sum + session.count, 0);
+          weeklyData.push(dayTotal);
+        }
+
+        setWeeklyChartData(weeklyData);
+        setWeeklyChartLabels(weeklyLabels);
+        console.log('Weekly chart data (last 7 days):', weeklyData);
+        console.log('Weekly chart labels:', weeklyLabels);
+
+        // Calculate 7-DAY INSIGHTS
+        const totalRepsLast7Days = weeklyData.reduce((sum, dayTotal) => sum + dayTotal, 0);
+        const avgRepsPerDayLast7Days = Math.round(totalRepsLast7Days / 7);
+
+        // Count sessions in last 7 days
+        const last7DaysSessions = sessions.filter(session => {
+          const sessionDate = new Date(session.startedAt);
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6); // Include today, so -6 days
+          return sessionDate >= sevenDaysAgo;
+        });
+
+        setLast7DaysReps(totalRepsLast7Days);
+        setAvgRepsPerDay(avgRepsPerDayLast7Days);
+        setSessionsLast7Days(last7DaysSessions.length);
+
+        console.log('Last 7 days total reps:', totalRepsLast7Days);
+        console.log('Average reps per day (last 7 days):', avgRepsPerDayLast7Days);
+        console.log('Sessions in last 7 days:', last7DaysSessions.length);
+
+        // Calculate goal streak using the dedicated function
+        calculateGoalStreak(sessions, userDailyGoal);
+
+        // Get today's date in YYYY-MM-DD format for comparison
+        const today = new Date();
+        const todayForSessionsString = today.toISOString().split('T')[0];
+
+        // Filter sessions from today and sum up the count (not reps!)
+        const todaysSessions = sessions.filter(session => {
+          // Use startedAt field instead of date
+          const sessionDate = new Date(session.startedAt).toISOString().split('T')[0];
+          return sessionDate === todayForSessionsString;
+        });
+
+        // Sum up count field (not reps!)
+        const totalRepsToday = todaysSessions.reduce((sum, session) => sum + session.count, 0);
+        setTodayReps(totalRepsToday);
+
+        // Calculate last 7 days of data for sparkline
+        const last7Days = [];
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const dateString = date.toISOString().split('T')[0];
+
+          const daysSessions = sessions.filter(session => {
+            const sessionDate = new Date(session.startedAt).toISOString().split('T')[0];
+            return sessionDate === dateString;
+          });
+
+          const dayTotal = daysSessions.reduce((sum, session) => sum + session.count, 0);
+          last7Days.push(dayTotal);
+        }
+
+        setTodayRepsData(last7Days);
+
+        console.log('Today\'s sessions:', todaysSessions);
+        console.log('Total reps today:', totalRepsToday);
+        console.log('Total all-time reps:', totalAllTimeReps);
+        console.log('Daily totals by date:', dailyTotals);
+        console.log('Best day total:', bestDayTotal);
+        console.log('Best day date:', bestDayDate);
+        console.log('Last 7 days data for sparkline:', last7Days);
+        console.log('Last 30 days cumulative data:', last30Days);
+        console.log('Daily totals progression:', last10DailyTotals);
+      } catch (err) {
+        console.error('Error fetching today\'s reps:', err);
+        setTodayReps(0); // Default to 0 if API call fails
+        setTodayRepsData([]); // Empty sparkline data if API call fails
+        setAllTimeReps(0);
+        setAllTimeRepsData([]);
+        setBestDay(0);
+        setBestDayData([]);
+        setAppearanceStreak(0);
+        setAppearanceStreakData([]);
+        setAppearanceStreakColor('red');
+        setAvgPerSession(0);
+        setAvgPerSessionData([]);
+        setRecentSessions([]);
+        setWeeklyChartData([]);
+        setWeeklyChartLabels([]);
+        setLast7DaysReps(0);
+        setAvgRepsPerDay(0);
+        setSessionsLast7Days(0);
+        setGoalStreak(0);
+        setGoalStreakData('Start your goal streak!');
+        setGoalStreakColor('red');
+      }
+    }; fetchUserName();
+    fetchTodayReps();
   }, []);
 
-  const handleEditGoal = () => {
-    const newGoal = prompt('Enter your new daily goal:', data.user.dailyGoal.toString());
+  const handleEditGoal = async () => {
+    const newGoal = prompt('Enter your new daily goal:', dailyGoal.toString());
     if (newGoal && !isNaN(newGoal) && parseInt(newGoal) > 0) {
-      setData(prev => ({
-        ...prev,
-        user: {
-          ...prev.user,
-          dailyGoal: parseInt(newGoal)
+      try {
+        // Save to backend
+        const response = await authAPI.updateDailyGoal(parseInt(newGoal));
+
+        if (response.data.success) {
+          // Update local state
+          setDailyGoal(parseInt(newGoal));
+          // Recalculate goal streak with new goal
+          calculateGoalStreak(allSessions, parseInt(newGoal));
+          console.log('Daily goal updated successfully');
         }
-      }));
+      } catch (error) {
+        console.error('Error updating daily goal:', error);
+        alert('Failed to save daily goal. Please try again.');
+      }
     }
   };
 
@@ -319,38 +756,42 @@ function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
             <StatCard
               title="Today's Reps"
-              value={data.stats.todayReps.value}
-              data={data.stats.todayReps.data}
+              value={todayReps}
+              data={todayRepsData} // Real sparkline data showing last 7 days
               color="#3b82f6"
             />
             <StatCard
               title="All-time"
-              value={data.stats.allTimeReps.value.toLocaleString()}
-              data={data.stats.allTimeReps.data}
+              value={allTimeReps.toLocaleString()}
+              data={allTimeRepsData} // Real cumulative sparkline data
               color="#f59e0b"
             />
             <StatCard
               title="Best Day"
-              value={data.stats.bestDay.value}
-              data={data.stats.bestDay.data}
+              value={bestDay}
+              data={bestDayData} // Real personal records progression
               color="#8b5cf6"
             />
-            <StatCard
-              title="Appearance Streak"
-              value={data.stats.streak.value}
-              data={data.stats.streak.data}
-              color="#ef4444"
-            />
-            <StatCard
-              title="Goal Streak"
-              value={data.stats.streak.value}
-              data={data.stats.streak.data}
-              color="#10b981"
-            />
+            {/* Custom Appearance Streak Card with Message */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6 text-center transition-all duration-200 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10">
+              <div className="text-4xl font-extrabold text-gray-900 mb-1">{appearanceStreak}</div>
+              <div className="text-sm text-gray-500 font-medium mb-3">Appearance Streak</div>
+              <div className={`text-sm font-medium px-3 py-2 rounded-lg ${getStreakColorClasses(appearanceStreakColor)}`}>
+                {appearanceStreakData}
+              </div>
+            </div>
+            {/* Custom Goal Streak Card with Message */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6 text-center transition-all duration-200 hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/10">
+              <div className="text-4xl font-extrabold text-gray-900 mb-1">{goalStreak}</div>
+              <div className="text-sm text-gray-500 font-medium mb-3">Goal Streak</div>
+              <div className={`text-sm font-medium px-3 py-2 rounded-lg ${getStreakColorClasses(goalStreakColor)}`}>
+                {goalStreakData}
+              </div>
+            </div>
             <StatCard
               title="Avg/Session"
-              value={data.stats.avgPerSession.value}
-              data={data.stats.avgPerSession.data}
+              value={avgPerSession} // Real average per session
+              data={avgPerSessionData} // Real avg per session progression
               color="#06b6d4"
             />
           </div>
@@ -359,54 +800,50 @@ function Dashboard() {
         {/* Goal Progress */}
         <div className="mb-10">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Daily Goal</h2>
-          <ProgressBar
-            current={data.user.todayReps}
-            goal={data.user.dailyGoal}
-            onEditGoal={handleEditGoal}
-          />
+          {dailyGoal !== null ? (
+            <ProgressBar
+              current={todayReps} // Use real today's reps from actual sessions
+              goal={dailyGoal} // Use real daily goal from user profile
+              onEditGoal={handleEditGoal}
+            />
+          ) : (
+            <div className="bg-white border border-gray-200 rounded-xl p-6 text-center">
+              <div className="text-gray-500">Loading goal...</div>
+            </div>
+          )}
         </div>
 
         {/* Trends & Insights */}
         <div className="mb-10">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Trends & Insights</h2>
           <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <WeeklyChart data={data.weeklyChart} />
+            <WeeklyChart data={weeklyChartData} labels={weeklyChartLabels} />
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
               <div className="bg-gray-50 rounded-lg p-4 text-center">
                 <div className="text-2xl font-bold text-gray-900">
-                  {data.stats.weeklyReps.value}
+                  {last7DaysReps}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
-                  This Week's Reps
+                  Reps in Last 7 Days
                 </div>
               </div>
               <div className="bg-gray-50 rounded-lg p-4 text-center">
                 <div className="text-2xl font-bold text-gray-900">
-                  {data.insights.avgRepsPerSession}
+                  {avgRepsPerDay}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
-                  Avg Reps/Session
+                  Avg Reps/Day
                 </div>
               </div>
               <div className="bg-gray-50 rounded-lg p-4 text-center">
                 <div className="text-2xl font-bold text-gray-900">
-                  {data.insights.sessionsPerWeek}
+                  {sessionsLast7Days}
                 </div>
                 <div className="text-xs text-gray-500 mt-1">
-                  Sessions/Week
+                  # Sessions (Past 7 Days)
                 </div>
               </div>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4 text-sm text-blue-900">
-              {data.insights.mostActiveDay ? (
-                `💡 You're most active on ${data.insights.mostActiveDay}. Try scheduling sessions on quieter days like Thursday!`
-              ) : data.recentSessions.length > 0 ? (
-                "📈 Keep logging sessions to get personalized insights about your activity patterns!"
-              ) : (
-                "🚀 Complete a few sessions to unlock personalized insights and tips!"
-              )}
             </div>
           </div>
         </div>
@@ -415,27 +852,18 @@ function Dashboard() {
         <div className="mb-10">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Recent Sessions</h2>
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            {data.recentSessions.length === 0 ? (
+            {recentSessions.length === 0 ? (
               // Empty state for new users
               <div className="text-center py-12 px-4 text-gray-500">
                 <div className="text-5xl mb-4 opacity-50">💪</div>
-                <div className="text-lg font-semibold mb-2">No sessions yet</div>
-                <div className="text-sm mb-4">
-                  Start your first push-up session to see your progress here!
-                </div>
-                <button
-                  onClick={handleStartSession}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-lg font-semibold text-sm hover:from-blue-600 hover:to-blue-800 transition-all duration-200"
-                >
-                  Start Your First Session
-                </button>
+                <div className="text-lg font-semibold">No sessions yet</div>
               </div>
             ) : (
-              data.recentSessions.map((session, index) => (
+              recentSessions.map((session, index) => (
                 <div
                   key={session.id}
                   onClick={() => handleSessionClick(session)}
-                  className={`px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors duration-200 ${index < data.recentSessions.length - 1 ? 'border-b border-gray-100' : ''
+                  className={`px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors duration-200 ${index < recentSessions.length - 1 ? 'border-b border-gray-100' : ''
                     }`}
                 >
                   <div className="flex-1">

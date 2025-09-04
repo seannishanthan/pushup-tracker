@@ -36,20 +36,24 @@ const userSchema = new mongoose.Schema({
     totalPushups: {
         type: Number,
         default: 0 //default value is 0
+    },
+    dailyGoal: {
+        type: Number,
+        default: 20 //default daily goal is 20 pushups
     }
 });
 
 // before we save the user to the database, we want to hash the password for security
 // this is a middleware function that runs before the save operation (runs in between the request and response)
 // the request is the user object being saved and the response is the user object with the hashed password
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
 
-    if(!this.isModified('password')) return next(); //if password is not modified, skip hashing
+    if (!this.isModified('password')) return next(); //if password is not modified, skip hashing
 
     try {
         // hash password with salt and call next middleware function
         const salt = await bcrypt.genSalt(12);
-        this.password = await bcrypt.hash(this.password, salt); 
+        this.password = await bcrypt.hash(this.password, salt);
         next();
 
     } catch (error) {
@@ -59,19 +63,20 @@ userSchema.pre('save', async function(next) {
 });
 
 // method of User schema to compare the candidate password entered by user with the hashed password in the database (this.password)
-userSchema.methods.comparePassword = async function(candidatePassword) {
+userSchema.methods.comparePassword = async function (candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
 };
 
 // a model instance method to get the user data without the password field
-userSchema.methods.getPublicProfile = function() {
+userSchema.methods.getPublicProfile = function () {
     return {
         id: this._id, //every mongoose document (User / row in database) has an _id field built in
         username: this.username,
         email: this.email,
         createdAt: this.createdAt,
         totalSessions: this.totalSessions,
-        totalPushups: this.totalPushups
+        totalPushups: this.totalPushups,
+        dailyGoal: this.dailyGoal
     };
 };
 
