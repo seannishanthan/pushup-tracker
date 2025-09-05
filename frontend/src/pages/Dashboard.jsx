@@ -268,9 +268,19 @@ function Dashboard() {
     }
   };
 
+  // Helper function to get local date string (YYYY-MM-DD) without timezone issues
+  const getLocalDateString = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   // Function to calculate goal streak
   const calculateGoalStreak = (sessions, goalValue) => {
+    console.log('🎯 calculateGoalStreak called with:', sessions?.length, 'sessions, goal:', goalValue);
     if (!sessions || sessions.length === 0 || !goalValue) {
+      console.log('❌ No sessions or goal value, setting streak to 0');
       setGoalStreak(0);
       setGoalStreakData('Start your goal streak!');
       setGoalStreakColor('red');
@@ -280,7 +290,7 @@ function Dashboard() {
     // Group sessions by date to get daily totals
     const dailyTotalsForGoal = {};
     sessions.forEach(session => {
-      const sessionDate = new Date(session.startedAt).toISOString().split('T')[0];
+      const sessionDate = getLocalDateString(new Date(session.startedAt));
       if (!dailyTotalsForGoal[sessionDate]) {
         dailyTotalsForGoal[sessionDate] = 0;
       }
@@ -289,9 +299,14 @@ function Dashboard() {
 
     // Get today's date and check if user met goal today
     const todayGoalDate = new Date();
-    const todayGoalDateString = todayGoalDate.toISOString().split('T')[0];
+    const todayGoalDateString = getLocalDateString(todayGoalDate);
     const todayGoalReps = dailyTotalsForGoal[todayGoalDateString] || 0;
     const metGoalToday = todayGoalReps >= goalValue;
+
+    console.log('📅 Today date string:', todayGoalDateString);
+    console.log('🎯 Today goal reps:', todayGoalReps);
+    console.log('✅ Met goal today:', metGoalToday);
+    console.log('📊 Daily totals:', dailyTotalsForGoal);
 
     // Calculate goal streak by going backwards from today (or yesterday if goal not met today)
     let currentGoalStreak = 0;
@@ -301,7 +316,7 @@ function Dashboard() {
     for (let i = startGoalDay; i < 365; i++) { // Max check 365 days back
       const checkGoalDate = new Date(todayGoalDate);
       checkGoalDate.setDate(checkGoalDate.getDate() - i);
-      const dateGoalString = checkGoalDate.toISOString().split('T')[0];
+      const dateGoalString = getLocalDateString(checkGoalDate);
 
       const dayReps = dailyTotalsForGoal[dateGoalString] || 0;
       const metGoalThisDay = dayReps >= goalValue;
@@ -381,12 +396,14 @@ function Dashboard() {
     // Fetch today's reps from user sessions
     const fetchTodayReps = async () => {
       try {
+        console.log('🔄 Starting fetchTodayReps...');
         // Get user profile first to get the daily goal
         const userResponse = await authAPI.getProfile();
         const userDailyGoal = userResponse?.data?.user?.dailyGoal || 20;
+        console.log('👤 User daily goal:', userDailyGoal);
 
         const sessionsResponse = await pushupAPI.list();
-        console.log('Raw API response:', sessionsResponse);
+        console.log('📊 Raw API response:', sessionsResponse);
 
         // The correct path is sessionsResponse.data.data.sessions
         const sessions = sessionsResponse.data.data.sessions || [];
@@ -395,6 +412,7 @@ function Dashboard() {
 
         // Store all sessions in state for goal streak recalculation
         setAllSessions(sessions);
+        console.log('💾 Stored sessions in state:', sessions.length, 'sessions');
 
         // Calculate ALL-TIME total reps
         const totalAllTimeReps = sessions.reduce((sum, session) => sum + session.count, 0);
@@ -461,12 +479,12 @@ function Dashboard() {
         // Calculate APPEARANCE STREAK (consecutive days with at least 1 session)
         // Create array of dates with sessions
         const datesWithSessions = new Set(
-          sessions.map(session => new Date(session.startedAt).toISOString().split('T')[0])
+          sessions.map(session => getLocalDateString(new Date(session.startedAt)))
         );
 
         // Get today's date in YYYY-MM-DD format
         const todayDate = new Date();
-        const todayDateString = todayDate.toISOString().split('T')[0];
+        const todayDateString = getLocalDateString(todayDate);
         const hasSessionToday = datesWithSessions.has(todayDateString);
 
         // Calculate current streak
@@ -477,7 +495,7 @@ function Dashboard() {
         for (let i = startDay; i < 365; i++) { // Max check 365 days back
           const checkDate = new Date(todayDate);
           checkDate.setDate(checkDate.getDate() - i);
-          const dateString = checkDate.toISOString().split('T')[0];
+          const dateString = getLocalDateString(checkDate);
 
           if (datesWithSessions.has(dateString)) {
             currentStreak++;
@@ -631,17 +649,19 @@ function Dashboard() {
 
         // Get today's date in YYYY-MM-DD format for comparison
         const today = new Date();
-        const todayForSessionsString = today.toISOString().split('T')[0];
+        const todayForSessionsString = getLocalDateString(today);
 
         // Filter sessions from today and sum up the count (not reps!)
         const todaysSessions = sessions.filter(session => {
           // Use startedAt field instead of date
-          const sessionDate = new Date(session.startedAt).toISOString().split('T')[0];
+          const sessionDate = getLocalDateString(new Date(session.startedAt));
           return sessionDate === todayForSessionsString;
         });
 
         // Sum up count field (not reps!)
         const totalRepsToday = todaysSessions.reduce((sum, session) => sum + session.count, 0);
+        console.log('📅 Today\'s sessions:', todaysSessions);
+        console.log('🎯 Total reps today:', totalRepsToday);
         setTodayReps(totalRepsToday);
 
         // Calculate last 7 days of data for sparkline
@@ -649,10 +669,10 @@ function Dashboard() {
         for (let i = 6; i >= 0; i--) {
           const date = new Date();
           date.setDate(date.getDate() - i);
-          const dateString = date.toISOString().split('T')[0];
+          const dateString = getLocalDateString(date);
 
           const daysSessions = sessions.filter(session => {
-            const sessionDate = new Date(session.startedAt).toISOString().split('T')[0];
+            const sessionDate = getLocalDateString(new Date(session.startedAt));
             return sessionDate === dateString;
           });
 
