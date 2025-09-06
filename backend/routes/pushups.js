@@ -10,7 +10,7 @@ router.use(authenticateToken);
 // route to create a new pushup session
 router.post('/', validateSession, async (req, res) => {
     try {
-        const { count, startedAt, endedAt, notes } = req.body;
+        const { count, startedAt, endedAt, durationSec, notes } = req.body;
         const userId = req.user.id; // req.user is attached by JWT middleware
 
         // Set default times if not provided
@@ -20,6 +20,7 @@ router.post('/', validateSession, async (req, res) => {
             count,
             startedAt: startedAt ? new Date(startedAt) : now,
             endedAt: endedAt ? new Date(endedAt) : now,
+            durationSec: durationSec || 0,
             notes: notes || ''
         };
 

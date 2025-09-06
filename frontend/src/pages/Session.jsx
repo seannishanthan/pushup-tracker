@@ -502,6 +502,7 @@ function Session() {
             count: pushupStateRef.current.count,
             startedAt: sessionStartTime.toISOString(),
             endedAt: sessionEndTime.toISOString(),
+            durationSec: sessionDuration,
             notes: `Session completed with ${pushupStateRef.current.count} pushups in ${sessionDuration} seconds`
         };
 

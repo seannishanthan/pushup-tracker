@@ -568,9 +568,12 @@ function Dashboard() {
           const sessionDate = new Date(session.startedAt);
           const now = new Date();
 
-          // Format date
+          // Format date - compare dates at day level, not exact times
           let dateString;
-          const diffTime = Math.abs(now - sessionDate);
+          const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const sessionDay = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
+
+          const diffTime = today - sessionDay;
           const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
           if (diffDays === 0) {
@@ -581,8 +584,8 @@ function Dashboard() {
             dateString = `${sessionDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${sessionDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
           }
 
-          // Calculate duration (assuming session has duration or we calculate from start/end)
-          const duration = session.duration || '2min 30sec'; // Use session duration if available, otherwise default
+          // Use the durationFormatted virtual field from the backend
+          const duration = session.durationFormatted || '0s';
 
           return {
             id: session._id,
