@@ -513,9 +513,6 @@ function Session() {
             console.log('Attempting to save session to backend...');
             const response = await pushupAPI.create(sessionData);
             console.log('✅ Session saved successfully:', response.data);
-
-            // Show success feedback (optional)
-            alert('Session saved successfully!');
         } catch (error) {
             console.error('❌ Failed to save session:', error);
             console.error('Error response:', error.response?.data);

@@ -2,89 +2,6 @@ import React, { useState, useEffect } from 'react';
 import NavBar from "../components/NavBar";
 import { authAPI, pushupAPI } from '../utils/api';
 
-// Sample data variations - in real app, this would come from your API/state management
-const sampleDataExisting = {
-  user: {
-    name: "Sean", // This will be replaced with real user name
-    todayReps: 12,
-    dailyGoal: 20
-  },
-  stats: {
-    todayReps: { value: 12, data: [8, 10, 5, 15, 18, 22, 12] },
-    weeklyReps: { value: 89, data: [65, 72, 80, 85, 89, 95, 89] },
-    allTimeReps: { value: 1247, data: [1100, 1150, 1180, 1200, 1220, 1235, 1247] },
-    streak: { value: 7, data: [3, 4, 5, 6, 7, 7, 7] },
-    bestDay: { value: 45, data: [38, 42, 40, 45, 43, 41, 40] },
-    avgPerSession: { value: 18, data: [16, 17, 19, 18, 17, 18, 18] }
-  },
-  recentSessions: [
-    { id: 1, date: "Today, 9:15 AM", duration: "2min 30sec", reps: 12 },
-    { id: 2, date: "Yesterday, 7:45 AM", duration: "3min 15sec", reps: 18 },
-    { id: 3, date: "Dec 13, 8:20 AM", duration: "4min 10sec", reps: 25 },
-    { id: 4, date: "Dec 12, 6:30 PM", duration: "2min 45sec", reps: 15 },
-    { id: 5, date: "Dec 11, 9:10 AM", duration: "3min 20sec", reps: 22 }
-  ],
-  weeklyChart: [18, 12, 24, 9, 21, 27, 15],
-  insights: {
-    avgRepsPerSession: 18,
-    sessionsPerWeek: 5,
-    mostActiveDay: "Tuesdays and Saturdays"
-  }
-};
-
-// New user with minimal data
-const sampleDataNewUser = {
-  user: {
-    name: "Alex",
-    todayReps: 0,
-    dailyGoal: 10
-  },
-  stats: {
-    todayReps: { value: 0, data: [] },
-    weeklyReps: { value: 0, data: [] },
-    allTimeReps: { value: 0, data: [] },
-    streak: { value: 0, data: [] },
-    bestDay: { value: 0, data: [] },
-    avgPerSession: { value: 0, data: [] }
-  },
-  recentSessions: [],
-  weeklyChart: [0, 0, 0, 0, 0, 0, 0],
-  insights: {
-    avgRepsPerSession: 0,
-    sessionsPerWeek: 0,
-    mostActiveDay: null
-  }
-};
-
-// User with some data but not enough for full sparklines
-const sampleDataLimitedUser = {
-  user: {
-    name: "Jordan",
-    todayReps: 5,
-    dailyGoal: 15
-  },
-  stats: {
-    todayReps: { value: 5, data: [0, 0, 0, 0, 0, 3, 5] }, // Only 2 days of data
-    weeklyReps: { value: 8, data: [8] }, // Only this week
-    allTimeReps: { value: 8, data: [8] },
-    streak: { value: 2, data: [0, 1, 2] },
-    bestDay: { value: 5, data: [3, 5] },
-    avgPerSession: { value: 4, data: [3, 5] }
-  },
-  recentSessions: [
-    { id: 1, date: "Today, 10:30 AM", duration: "1min 45sec", reps: 5 },
-    { id: 2, date: "Yesterday, 8:15 AM", duration: "1min 20sec", reps: 3 }
-  ],
-  weeklyChart: [0, 0, 0, 0, 0, 3, 5],
-  insights: {
-    avgRepsPerSession: 4,
-    sessionsPerWeek: 2,
-    mostActiveDay: null
-  }
-};
-
-// Toggle between different user types for demo
-const sampleData = sampleDataExisting; // Change this to test different scenarios
 
 // Sparkline component with empty state handling
 const Sparkline = ({ data, color = "#3b82f6", width = 100, height = 30 }) => {
@@ -207,7 +124,7 @@ const WeeklyChart = ({ data, labels }) => {
 
   return (
     <div>
-      <h3 className="mb-4 text-gray-900 font-semibold">7-Day Activity</h3>
+      <h3 className="mb-4 text-gray-900 font-semibold">Past 7-Day Activity</h3>
       <div className="flex items-end gap-2 px-4 mb-2" style={{ height: '120px' }}>
         {data.map((value, index) => (
           <div
@@ -228,7 +145,6 @@ const WeeklyChart = ({ data, labels }) => {
 };
 
 function Dashboard() {
-  const [data, setData] = useState(sampleData);
   const [userName, setUserName] = useState('User'); // State for real user name
   const [todayReps, setTodayReps] = useState(0); // State for real today's reps
   const [todayRepsData, setTodayRepsData] = useState([]); // State for sparkline data
