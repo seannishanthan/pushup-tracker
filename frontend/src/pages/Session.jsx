@@ -25,16 +25,13 @@ function Session() {
     // Debug state to see what's happening
     const [debugInfo, setDebugInfo] = useState({ armAngle: 0, bodyAngle: 0, visibility: 0 });
 
-    // Push-up detection parameters - made more sensitive
+    // Push-up detection parameters - simplified state machine approach
     const pushupStateRef = useRef({
         count: 0,
-        lastPosition: 'unknown',
-        armAngleThreshold: { up: 130, down: 120 }, // More sensitive thresholds
-        stabilityFrames: 0,
-        requiredStabilityFrames: 1, // Reduced stability requirement
-        positionHistory: [], // Track last few positions for better detection
-        hasSeenDown: false, // Track if we've seen a down position
-        hasSeenUp: false // Track if we've seen an up position
+        phase: 'waiting',           // waiting -> down -> holding -> up -> waiting
+        downStartTime: null,        // When we entered down position
+        requiredHoldTime: 120,      // Minimum hold time (120ms)
+        armAngleThreshold: { up: 130, down: 120, upExit: 125, downExit: 125 }, // Hysteresis thresholds
     });
 
     // Timer for session duration
@@ -124,66 +121,89 @@ function Session() {
                 visibility: Math.round(avgVisibility * 100)
             });
 
-            // Determine current position based on arm angle with hysteresis
-            let newPosition = 'transition';
+            // Simplified state machine for pushup detection
+            const state = pushupStateRef.current;
+            let currentPhase = state.phase;
 
-            if (armAngle >= pushupStateRef.current.armAngleThreshold.up) {
-                newPosition = 'up';
-                if (!pushupStateRef.current.hasSeenUp) {
-                    console.log(`🔵 First time seeing UP position! Angle: ${armAngle.toFixed(1)}°`);
-                }
-                pushupStateRef.current.hasSeenUp = true;
-            } else if (armAngle <= pushupStateRef.current.armAngleThreshold.down) {
-                newPosition = 'down';
-                if (!pushupStateRef.current.hasSeenDown) {
-                    console.log(`🔴 First time seeing DOWN position! Angle: ${armAngle.toFixed(1)}°`);
-                }
-                pushupStateRef.current.hasSeenDown = true;
-                // Reset hasSeenUp when we enter down position (start of new rep cycle)
-                if (pushupStateRef.current.hasSeenUp && pushupStateRef.current.lastPosition !== 'down') {
-                    console.log(`🔄 Resetting UP flag - starting new rep cycle`);
-                    pushupStateRef.current.hasSeenUp = false;
-                }
+            // State machine transitions
+            switch (state.phase) {
+                case 'waiting':
+                    // Start pushup when arm angle goes below down threshold
+                    if (armAngle <= state.armAngleThreshold.down) {
+                        currentPhase = 'down';
+                        state.downStartTime = Date.now();
+                        console.log(`🔴 Entering DOWN phase! Angle: ${armAngle.toFixed(1)}°`);
+                    }
+                    break;
+
+                case 'down':
+                    // If we leave down position too early, reset to waiting
+                    if (armAngle > state.armAngleThreshold.downExit) {
+                        currentPhase = 'waiting';
+                        state.downStartTime = null;
+                        console.log(`🔄 Left down position too early, resetting to waiting`);
+                    }
+                    // If we've held down long enough, move to holding phase
+                    else if (state.downStartTime && (Date.now() - state.downStartTime) >= state.requiredHoldTime) {
+                        currentPhase = 'holding';
+                        console.log(`⏱️ Hold requirement met! Moving to holding phase`);
+                    }
+                    break;
+
+                case 'holding':
+                    // Still in down position - stay in holding
+                    if (armAngle <= state.armAngleThreshold.down) {
+                        // Continue holding
+                    }
+                    // Move to up position - count the rep!
+                    else if (armAngle >= state.armAngleThreshold.up) {
+                        currentPhase = 'up';
+                        state.count++;
+                        setPushupCount(state.count);
+                        console.log(`🎉 Push-up #${state.count} completed! Angle: ${armAngle.toFixed(1)}°`);
+                    }
+                    // In transition zone - stay in holding
+                    else {
+                        // Stay in holding phase during transition
+                    }
+                    break;
+
+                case 'up':
+                    // Wait for user to go back down before allowing next rep
+                    if (armAngle <= state.armAngleThreshold.upExit) {
+                        currentPhase = 'waiting';
+                        state.downStartTime = null;
+                        console.log(`🔄 Ready for next rep`);
+                    }
+                    break;
+
+                default:
+                    currentPhase = 'waiting';
+                    break;
             }
 
-            // Add to position history
-            pushupStateRef.current.positionHistory.push(newPosition);
-            if (pushupStateRef.current.positionHistory.length > 5) {
-                pushupStateRef.current.positionHistory.shift();
+            // Update state
+            state.phase = currentPhase;
+
+            // Set UI position based on current phase
+            let uiPosition;
+            switch (currentPhase) {
+                case 'down':
+                case 'holding':
+                    uiPosition = 'down';
+                    break;
+                case 'up':
+                    uiPosition = 'up';
+                    break;
+                default:
+                    uiPosition = armAngle <= 120 ? 'down' : armAngle >= 130 ? 'up' : 'transition';
+                    break;
             }
 
-            // Count push-up when we reach UP position after seeing DOWN (regardless of transition frames)
-            if (newPosition === 'up' && pushupStateRef.current.hasSeenDown && pushupStateRef.current.hasSeenUp) {
-
-                // Increment count immediately
-                pushupStateRef.current.count++;
-                setPushupCount(pushupStateRef.current.count);
-
-                console.log(`🎉 Push-up #${pushupStateRef.current.count} completed! Arm angle: ${armAngle.toFixed(1)}°`);
-
-                // Reset flags for next rep - but keep hasSeenUp true since we're still in up position
-                pushupStateRef.current.hasSeenDown = false;
-                // Don't reset hasSeenUp immediately since we're still in the up position
-            } else {
-                // Debug: Why didn't we count?
-                if (newPosition === 'up' && pushupStateRef.current.hasSeenDown) {
-                    console.log(`❌ Reached UP but not counted:`, {
-                        newPosition: newPosition,
-                        hasSeenDown: pushupStateRef.current.hasSeenDown,
-                        hasSeenUp: pushupStateRef.current.hasSeenUp,
-                        armAngle: armAngle.toFixed(1)
-                    });
-                }
-            }
-
-            // Update last position
-            pushupStateRef.current.lastPosition = newPosition;
-            setCurrentPosition(newPosition);
+            setCurrentPosition(uiPosition);
 
             // Debug logging
-            if (armAngle < 140) { // Only log when in lower positions
-                console.log(`Arm angle: ${armAngle.toFixed(1)}°, Position: ${newPosition}, Count: ${pushupStateRef.current.count}`);
-            }
+            console.log(`Phase: ${currentPhase}, Angle: ${armAngle.toFixed(1)}°, Count: ${state.count}`);
 
         } catch (error) {
             console.error('Error in push-up detection:', error);
@@ -202,14 +222,35 @@ function Session() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (results.poseLandmarks) {
-            // Draw connections
-            drawing.drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, {
+            // Define which landmarks to draw (exclude hands/fingers for performance)
+            const relevantLandmarks = [
+                11, 12, // Left/Right Shoulder
+                13, 14, // Left/Right Elbow  
+                15, 16, // Left/Right Wrist
+                23, 24, // Left/Right Hip (for body alignment)
+                25, 26, // Left/Right Knee
+                27, 28  // Left/Right Ankle
+            ];
+
+            // Draw only relevant connections (exclude hand connections)
+            const relevantConnections = POSE_CONNECTIONS.filter(connection => {
+                const [start, end] = connection;
+                // Only draw connections where both points are in our relevant landmarks
+                return relevantLandmarks.includes(start) && relevantLandmarks.includes(end);
+            });
+
+            // Draw filtered connections
+            drawing.drawConnectors(ctx, results.poseLandmarks, relevantConnections, {
                 color: '#00FF00',
                 lineWidth: 2
             });
 
-            // Draw landmarks
-            drawing.drawLandmarks(ctx, results.poseLandmarks, {
+            // Draw only relevant landmarks
+            const filteredLandmarks = results.poseLandmarks.filter((landmark, index) =>
+                relevantLandmarks.includes(index)
+            );
+
+            drawing.drawLandmarks(ctx, filteredLandmarks, {
                 color: '#FF0000',
                 lineWidth: 1,
                 radius: 3
@@ -257,13 +298,10 @@ function Session() {
         // Reset push-up tracking state
         pushupStateRef.current = {
             count: 0,
-            lastPosition: 'unknown',
-            armAngleThreshold: { up: 130, down: 120 },
-            stabilityFrames: 0,
-            requiredStabilityFrames: 1,
-            positionHistory: [],
-            hasSeenDown: false,
-            hasSeenUp: false
+            phase: 'waiting',
+            downStartTime: null,
+            requiredHoldTime: 120,
+            armAngleThreshold: { up: 130, down: 120, upExit: 125, downExit: 125 }
         };
         setPushupCount(0);
         setCurrentPosition('unknown');
@@ -307,6 +345,13 @@ function Session() {
             videoRef.current.srcObject = null;
         }
 
+        // Clear the canvas to remove any remaining pose drawings
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
         // Reset tracking state
         setPushupCount(0);
         setCurrentPosition('unknown');
@@ -322,6 +367,13 @@ function Session() {
         if (stream) {
             stream.getTracks().forEach((t) => t.stop());
             videoRef.current.srcObject = null;
+        }
+
+        // Clear the canvas to remove any remaining pose drawings
+        const canvas = canvasRef.current;
+        if (canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
 
         // Save session data
@@ -401,7 +453,7 @@ function Session() {
 
             {/* Debug Information */}
             {status === 'running' && (
-                <div className="grid grid-cols-4 gap-4 mb-4 text-xs">
+                <div className="grid grid-cols-5 gap-4 mb-4 text-xs">
                     <div className="bg-gray-100 p-2 rounded text-center">
                         <div className="font-semibold">Arm Angle</div>
                         <div className={debugInfo.armAngle <= 120 ? 'text-blue-600 font-bold' : 'text-gray-600'}>
@@ -409,14 +461,20 @@ function Session() {
                         </div>
                     </div>
                     <div className="bg-gray-100 p-2 rounded text-center">
-                        <div className="font-semibold">State Flags</div>
+                        <div className="font-semibold">Current Phase</div>
                         <div className="text-xs">
-                            <div className={pushupStateRef.current?.hasSeenDown ? 'text-blue-600' : 'text-gray-400'}>
-                                Down: {pushupStateRef.current?.hasSeenDown ? '✓' : '✗'}
+                            <div className={pushupStateRef.current?.phase === 'down' ? 'text-blue-600 font-bold' : 'text-gray-400'}>
+                                {pushupStateRef.current?.phase || 'waiting'}
                             </div>
-                            <div className={pushupStateRef.current?.hasSeenUp ? 'text-green-600' : 'text-gray-400'}>
-                                Up: {pushupStateRef.current?.hasSeenUp ? '✓' : '✗'}
-                            </div>
+                        </div>
+                    </div>
+                    <div className="bg-gray-100 p-2 rounded text-center">
+                        <div className="font-semibold">Hold Time</div>
+                        <div className={pushupStateRef.current?.downStartTime ? 'text-orange-600 font-bold' : 'text-gray-400'}>
+                            {pushupStateRef.current?.downStartTime ?
+                                `${Math.max(0, Date.now() - pushupStateRef.current.downStartTime)}ms` :
+                                '0ms'
+                            }
                         </div>
                     </div>
                     <div className="bg-gray-100 p-2 rounded text-center">
@@ -466,6 +524,7 @@ function Session() {
                         <li>• Make sure your <strong>arms and shoulders</strong> are clearly visible</li>
                         <li>• Ensure good lighting on the side facing the camera</li>
                         <li>• Do <strong>slow, controlled</strong> push-ups for accurate counting</li>
+                        <li>• <strong>Hold at the bottom</strong> for at least 120ms to count the rep</li>
                         <li>• You should see <strong>green lines and red dots</strong> on your body when ready</li>
                         <li>• Watch arm angle: <strong>130°+ = Up</strong>, <strong>120°- = Down</strong></li>
                     </ul>
@@ -476,7 +535,7 @@ function Session() {
                 <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
                     <p className="text-sm text-green-700">
                         <strong>Tip:</strong> The arm angle will show in <strong className="text-blue-600">blue</strong> when in down position (≤120°).
-                        Reps are counted when you go from down to up position!
+                        You must <strong>hold at the bottom for 120ms</strong> before going up to count the rep!
                     </p>
                 </div>
             )}
