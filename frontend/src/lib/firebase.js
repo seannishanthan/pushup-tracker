@@ -20,14 +20,8 @@ if (firebaseConfig.apiKey) {
   console.log('✅ Firebase initialized successfully');
 } else {
   console.warn('⚠️ Firebase not initialized - missing environment variables');
-  console.warn('Please set VITE_FB_API_KEY, VITE_FB_AUTH_DOMAIN, VITE_FB_PROJECT_ID, and VITE_FB_APP_ID');
+  console.warn('Please set VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, and VITE_FIREBASE_APP_ID');
 }
 
-// Custom verification page setup:
-// To use the custom /verified page instead of Firebase's default page:
-// 1. Go to Firebase Console → Authentication → Templates
-// 2. Edit the "Email address verification" template
-// 3. Set the action URL to: https://yourdomain.com/verified
-// 4. This will redirect users to your custom verification success page
 
 export { app, auth };
