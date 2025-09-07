@@ -344,11 +344,11 @@ function Dashboard() {
         for (let i = 29; i >= 0; i--) {
           const date = new Date();
           date.setDate(date.getDate() - i);
-          const dateString = date.toISOString().split('T')[0];
+          const dateString = getLocalDateString(date);
 
           // Find sessions up to this date for cumulative total
           const sessionsUpToDate = sortedSessions.filter(session => {
-            const sessionDate = new Date(session.startedAt).toISOString().split('T')[0];
+            const sessionDate = getLocalDateString(new Date(session.startedAt));
             return sessionDate <= dateString;
           });
 
@@ -363,7 +363,7 @@ function Dashboard() {
         const dailyTotals = {};
 
         sessions.forEach(session => {
-          const sessionDate = new Date(session.startedAt).toISOString().split('T')[0];
+          const sessionDate = getLocalDateString(new Date(session.startedAt));
           if (!dailyTotals[sessionDate]) {
             dailyTotals[sessionDate] = 0;
           }
@@ -521,7 +521,7 @@ function Dashboard() {
         for (let i = 6; i >= 0; i--) {
           const date = new Date();
           date.setDate(date.getDate() - i);
-          const dateString = date.toISOString().split('T')[0];
+          const dateString = getLocalDateString(date);
 
           // Get day label (Mon, Tue, etc.)
           const dayLabel = date.toLocaleDateString('en-US', { weekday: 'short' });
@@ -529,7 +529,7 @@ function Dashboard() {
 
           // Filter sessions for this specific day
           const daysSessions = sessions.filter(session => {
-            const sessionDate = new Date(session.startedAt).toISOString().split('T')[0];
+            const sessionDate = getLocalDateString(new Date(session.startedAt));
             return sessionDate === dateString;
           });
 
