@@ -663,7 +663,11 @@ function Dashboard() {
   };
 
   const handleSessionClick = (session) => {
-    alert(`Session details for ${session.date} - Feature coming soon!`);
+    if (session.notes && session.notes.trim().length > 0) {
+      alert(`Notes:\n\n${session.notes}`);
+    } else {
+      alert('No notes were added for this session.');
+    }
   };
 
 
@@ -787,41 +791,78 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Recent Sessions */}
+        {/* Session History */}
         <div className="mb-10">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Recent Sessions</h2>
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            {recentSessions.length === 0 ? (
-              // Empty state for new users
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Session History</h2>
+          <div className="bg-white border border-gray-200 rounded-xl" style={{ maxHeight: '320px', overflowY: 'auto' }}>
+            {allSessions.length === 0 ? (
               <div className="text-center py-12 px-4 text-gray-500">
                 <div className="text-5xl mb-4 opacity-50">💪</div>
                 <div className="text-lg font-semibold">No sessions yet</div>
               </div>
             ) : (
-              recentSessions.map((session, index) => (
+              allSessions.map((session, index) => (
                 <div
-                  key={session.id}
-                  onClick={() => handleSessionClick(session)}
-                  className={`px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors duration-200 ${index < recentSessions.length - 1 ? 'border-b border-gray-100' : ''}`}
+                  key={session._id}
+                  onClick={() => handleSessionClick({
+                    id: session._id,
+                    date: (() => {
+                      const sessionDate = new Date(session.startedAt);
+                      const now = new Date();
+                      let dateString;
+                      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                      const sessionDay = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
+                      const diffTime = today - sessionDay;
+                      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                      if (diffDays === 0) {
+                        dateString = `Today, ${sessionDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                      } else if (diffDays === 1) {
+                        dateString = `Yesterday, ${sessionDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                      } else {
+                        dateString = `${sessionDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${sessionDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                      }
+                      return dateString;
+                    })(),
+                    duration: session.durationFormatted || '0s',
+                    reps: session.count,
+                    notes: session.notes || ''
+                  })}
+                  className={`px-6 py-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 transition-colors duration-200 ${index < allSessions.length - 1 ? 'border-b border-gray-100' : ''}`}
                 >
                   <div className="flex-1">
                     <div className="font-semibold text-gray-900 text-sm mb-1">
-                      {session.date}
+                      {(() => {
+                        const sessionDate = new Date(session.startedAt);
+                        const now = new Date();
+                        let dateString;
+                        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        const sessionDay = new Date(sessionDate.getFullYear(), sessionDate.getMonth(), sessionDate.getDate());
+                        const diffTime = today - sessionDay;
+                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                        if (diffDays === 0) {
+                          dateString = `Today, ${sessionDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                        } else if (diffDays === 1) {
+                          dateString = `Yesterday, ${sessionDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                        } else {
+                          dateString = `${sessionDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${sessionDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                        }
+                        return dateString;
+                      })()}
                     </div>
                     <div className="text-xs text-gray-500">
-                      Duration: {session.duration}
+                      Duration: {session.durationFormatted || '0s'}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="text-2xl font-bold text-blue-500">
-                      {session.reps}
+                      {session.count}
                     </div>
                     <button
                       onClick={async (event) => {
                         event.stopPropagation();
                         if (!window.confirm('Are you sure you want to delete this session?')) return;
                         try {
-                          await pushupAPI.delete(session.id);
+                          await pushupAPI.delete(session._id);
                           // Refresh dashboard data
                           const userResponse = await authAPI.getProfile();
                           if (userResponse?.data?.user?.username) setUserName(userResponse.data.user.username);
@@ -830,9 +871,6 @@ function Dashboard() {
                           const sessionsResponse = await pushupAPI.list();
                           const sessions = sessionsResponse.data.data.sessions || [];
                           setAllSessions(sessions);
-                          // Recalculate stats and recent sessions
-                          // ...existing code for stats update...
-                          // For simplicity, just call window.location.reload() to force update
                           window.location.reload();
                         } catch (error) {
                           alert('Failed to delete session. Please try again.');

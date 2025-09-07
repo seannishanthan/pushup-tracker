@@ -6,6 +6,9 @@ import { useNavigate } from 'react-router-dom';
 import { pushupAPI } from '../utils/api';
 
 function Session() {
+    // State for session notes
+    const [sessionNotes, setSessionNotes] = useState("");
+    const [showNotesInput, setShowNotesInput] = useState(false);
 
     // hook declarations
     const videoRef = useRef(null);
@@ -478,53 +481,43 @@ function Session() {
     };
 
     const stopAndSave = async () => {
-        setStatus('stopped');
+        setStatus('idle');
+        // Stop camera and pose detection
         if (cameraRef.current) await cameraRef.current.stop();
-
         const stream = videoRef.current?.srcObject;
         if (stream) {
             stream.getTracks().forEach((t) => t.stop());
             videoRef.current.srcObject = null;
         }
-
-        // Clear the canvas to remove any remaining pose drawings
+        // Clear the canvas
         const canvas = canvasRef.current;
         if (canvas) {
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
-
-        // Prepare session data for backend
+        // Show notes input
+        setShowNotesInput(true);
+    };
+    // Save session with notes
+    const saveSessionWithNotes = async () => {
         const sessionEndTime = new Date();
-        const sessionStartTime = new Date(sessionEndTime.getTime() - (sessionDuration * 1000));
-
         const sessionData = {
             count: pushupStateRef.current.count,
-            startedAt: sessionStartTime.toISOString(),
+            startedAt: sessionStartTime ? new Date(sessionStartTime).toISOString() : new Date().toISOString(),
             endedAt: sessionEndTime.toISOString(),
             durationSec: sessionDuration,
-            notes: `Session completed with ${pushupStateRef.current.count} pushups in ${sessionDuration} seconds`
+            notes: sessionNotes.slice(0, 500)
         };
-
-        console.log('Saving session data:', sessionData);
-
         try {
-            // Save session to backend
-            console.log('Attempting to save session to backend...');
             const response = await pushupAPI.create(sessionData);
             console.log('✅ Session saved successfully:', response.data);
         } catch (error) {
-            console.error('❌ Failed to save session:', error);
-            console.error('Error response:', error.response?.data);
-            console.error('Error status:', error.response?.status);
-
-            // Show error feedback to user
             alert(`Failed to save session: ${error.response?.data?.message || error.message}`);
         }
-
-        // Redirect to dashboard after saving
         navigate('/');
     };
+
+    // ...existing code...
 
     const goToDashboard = async () => {
         if (status === 'running') {
@@ -645,43 +638,62 @@ function Session() {
                 </div>
             )}
 
-            <div className="relative rounded-2xl overflow-hidden shadow">
-                <video ref={videoRef} className="w-full h-auto" autoPlay playsInline muted />
-                <canvas
-                    ref={canvasRef}
-                    className="absolute top-0 left-0 w-full h-full pointer-events-none"
-                    width={1280}
-                    height={720}
-                />
-
-                {/* Setup Phase Overlay */}
-                {status === 'running' && pushupStateRef.current?.phase === 'setup' && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="text-center">
-                            <div className="text-6xl font-bold mb-4 text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
-                                {setupCountdown}
-                            </div>
-                            <div className="text-2xl font-bold mb-2 text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">Get Into Position</div>
-                            <div className="text-lg text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">Position yourself sideways to camera</div>
-                            <div className="text-lg text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">Tracking starts when countdown ends</div>
-                        </div>
+            {/* Webcam or Notes Input */}
+            <div className="relative rounded-2xl overflow-hidden shadow min-h-[320px] flex items-center justify-center">
+                {showNotesInput ? (
+                    <div className="w-full flex flex-col items-center justify-center p-8">
+                        <h2 className="text-xl font-bold mb-2">Session Notes</h2>
+                        <textarea
+                            className="w-full max-w-xl h-32 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            maxLength={500}
+                            value={sessionNotes}
+                            onChange={e => setSessionNotes(e.target.value)}
+                            placeholder="Add any notes about your session (optional)"
+                        />
+                        <div className="text-xs text-gray-500 mt-1 mb-4">{sessionNotes.length}/500 characters</div>
                     </div>
-                )}
-
-                {/* Camera Preview Overlay */}
-                {status === 'idle' && (
-                    <div className="absolute bottom-4 right-4 pointer-events-none">
-                        <div className="bg-black bg-opacity-50 px-3 py-2 rounded-lg">
-                            <div className="text-sm font-semibold text-white">
-                                📹 Camera Preview
+                ) : (
+                    <>
+                        <video ref={videoRef} className="w-full h-auto" autoPlay playsInline muted />
+                        <canvas
+                            ref={canvasRef}
+                            className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                            width={1280}
+                            height={720}
+                        />
+                        {/* Setup Phase Overlay */}
+                        {status === 'running' && pushupStateRef.current?.phase === 'setup' && (
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <div className="text-center">
+                                    <div className="text-6xl font-bold mb-4 text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">
+                                        {setupCountdown}
+                                    </div>
+                                    <div className="text-2xl font-bold mb-2 text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">Get Into Position</div>
+                                    <div className="text-lg text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">Position yourself sideways to camera</div>
+                                    <div className="text-lg text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">Tracking starts when countdown ends</div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        )}
+                        {/* Camera Preview Overlay */}
+                        {status === 'idle' && (
+                            <div className="absolute bottom-4 right-4 pointer-events-none">
+                                <div className="bg-black bg-opacity-50 px-3 py-2 rounded-lg">
+                                    <div className="text-sm font-semibold text-white">
+                                        📹 Camera Preview
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
 
             <div className="flex gap-2 mt-4">
-                {status !== "running" ? (
+                {showNotesInput ? (
+                    <button onClick={saveSessionWithNotes} className="px-6 py-2 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700">
+                        Save Session
+                    </button>
+                ) : status !== "running" ? (
                     <button onClick={start} className="px-4 py-2 rounded-xl bg-green-600 text-white hover:bg-green-700">
                         Start Session
                     </button>
@@ -718,6 +730,7 @@ function Session() {
                 </div>
             )}
         </div>
+
     );
 }
 
