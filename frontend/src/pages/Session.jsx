@@ -26,12 +26,19 @@ function Session() {
     const [sessionStartTime, setSessionStartTime] = useState(null);
     const [sessionActualStartTime, setSessionActualStartTime] = useState(null);
     const [sessionDuration, setSessionDuration] = useState(0);
-    const [setupCountdown, setSetupCountdown] = useState(3);
+    const [setupCountdown, setSetupCountdown] = useState(5);
     const [countdownKey, setCountdownKey] = useState(0); // Force restart countdown
     const [poseKey, setPoseKey] = useState(0); // Force recreate MediaPipe pose
 
     // Debug state to see what's happening
-    const [debugInfo, setDebugInfo] = useState({ armAngle: 0, bodyAngle: 0, visibility: 0 });
+    const [debugInfo, setDebugInfo] = useState({
+        armAngle: 0,
+        bodyAngle: 0,
+        visibility: 0,
+        kneeVis: [0, 0],
+        ankleVis: [0, 0],
+        upperBodyVis: [0, 0, 0, 0, 0, 0]
+    });
 
     // Push-up detection parameters - simplified state machine approach
     const pushupStateRef = useRef({
@@ -41,7 +48,7 @@ function Session() {
         requiredHoldTime: 120,      // Minimum hold time (120ms)
         armAngleThreshold: { up: 130, down: 120, upExit: 125, downExit: 125 }, // Hysteresis thresholds
         setupStartTime: null,       // When setup phase started
-        setupDuration: 3000,        // 3 second setup period
+        setupDuration: 5000,        // 5 second setup period
     });
 
     // Timer for session duration
@@ -170,15 +177,22 @@ function Session() {
             const allLandmarks = [...upperBodyLandmarks, ...lowerBodyLandmarks];
 
             const validUpperBody = upperBodyLandmarks.filter(index =>
-                landmarks[index] && landmarks[index].visibility > 0.2
+                landmarks[index] && landmarks[index].visibility > 0.6
             );
 
+
+            // Print visibility for knees and ankles
+            const kneeVisibilities = [LEFT_KNEE, RIGHT_KNEE].map(index => landmarks[index]?.visibility ?? 0);
+            const ankleVisibilities = [LEFT_ANKLE, RIGHT_ANKLE].map(index => landmarks[index]?.visibility ?? 0);
+            const upperBodyVisibilities = upperBodyLandmarks.map(index => landmarks[index]?.visibility ?? 0);
+            console.log(`Knee visibilities:`, kneeVisibilities, `Ankle visibilities:`, ankleVisibilities);
+
             const validKnees = [LEFT_KNEE, RIGHT_KNEE].filter(index =>
-                landmarks[index] && landmarks[index].visibility > 0.2
+                landmarks[index] && landmarks[index].visibility > 0.6
             );
 
             const validAnkles = [LEFT_ANKLE, RIGHT_ANKLE].filter(index =>
-                landmarks[index] && landmarks[index].visibility > 0.2
+                landmarks[index] && landmarks[index].visibility > 0.6
             );
 
             const avgVisibility = allLandmarks.reduce((sum, index) =>
@@ -186,7 +200,13 @@ function Session() {
 
             // Require 4/6 upper body landmarks AND at least 1 knee AND 1 ankle for full body visibility
             if (validUpperBody.length < 4 || validKnees.length < 1 || validAnkles.length < 1) {
-                setDebugInfo(prev => ({ ...prev, visibility: Math.round(avgVisibility * 100) }));
+                setDebugInfo(prev => ({
+                    ...prev,
+                    visibility: Math.round(avgVisibility * 100),
+                    kneeVis: kneeVisibilities,
+                    ankleVis: ankleVisibilities,
+                    upperBodyVis: upperBodyVisibilities
+                }));
                 setCurrentPosition('landmarks_not_detected');
                 return;
             }
@@ -223,7 +243,10 @@ function Session() {
             setDebugInfo({
                 armAngle: Math.round(armAngle),
                 bodyAngle: 0, // Simplified for now
-                visibility: Math.round(avgVisibility * 100)
+                visibility: Math.round(avgVisibility * 100),
+                kneeVis: kneeVisibilities,
+                ankleVis: ankleVisibilities,
+                upperBodyVis: upperBodyVisibilities
             });
 
             // Simplified state machine for pushup detection
@@ -448,13 +471,13 @@ function Session() {
             requiredHoldTime: 120,
             armAngleThreshold: { up: 130, down: 120, upExit: 125, downExit: 125 },
             setupStartTime: null,
-            setupDuration: 3000
+            setupDuration: 5000
         };
         setPushupCount(0);
         setCurrentPosition('unknown');
         setSessionStartTime(Date.now());
         setSessionDuration(0);
-        setSetupCountdown(3);
+        setSetupCountdown(5);
         setCountdownKey(prev => prev + 1); // Force restart countdown timer
 
         // Camera stream should already be running from preview
@@ -600,7 +623,7 @@ function Session() {
 
             {/* Debug Information */}
             {status === 'running' && (
-                <div className="grid grid-cols-4 gap-4 mb-4 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-xs">
                     <div className="bg-gray-100 p-2 rounded text-center">
                         <div className="font-semibold">Arm Angle</div>
                         <div className={debugInfo.armAngle <= 120 ? 'text-blue-600 font-bold' : 'text-gray-600'}>
@@ -635,6 +658,20 @@ function Session() {
                         <div className="font-semibold">Full Body Visibility</div>
                         <div>{debugInfo.visibility}%</div>
                     </div>
+                    <div className="bg-gray-100 p-2 rounded text-left col-span-1 md:col-span-2">
+                        <div className="font-semibold mb-1">Landmark Visibilities</div>
+                        <div className="flex flex-wrap gap-2 justify-center">
+                            <div className="bg-blue-50 rounded px-2 py-1">
+                                <span className="font-semibold">Knees:</span> {debugInfo.kneeVis.map((v, i) => `K${i + 1}: ${(v * 100).toFixed(0)}%`).join(' | ')}
+                            </div>
+                            <div className="bg-blue-50 rounded px-2 py-1">
+                                <span className="font-semibold">Ankles:</span> {debugInfo.ankleVis.map((v, i) => `A${i + 1}: ${(v * 100).toFixed(0)}%`).join(' | ')}
+                            </div>
+                            <div className="bg-blue-50 rounded px-2 py-1">
+                                <span className="font-semibold">Upper Body:</span> {debugInfo.upperBodyVis.map((v, i) => `UB${i + 1}: ${(v * 100).toFixed(0)}%`).join(' | ')}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -644,7 +681,7 @@ function Session() {
                     <div className="w-full flex flex-col items-center justify-center p-8">
                         <h2 className="text-xl font-bold mb-2">Session Notes</h2>
                         <textarea
-                            className="w-full max-w-xl h-32 p-3 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            className="w-full max-w-2xl h-48 p-4 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 text-lg"
                             maxLength={500}
                             value={sessionNotes}
                             onChange={e => setSessionNotes(e.target.value)}
@@ -698,8 +735,8 @@ function Session() {
                         Start Session
                     </button>
                 ) : (
-                    <button onClick={stopAndSave} className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700">
-                        Stop & Save Session
+                    <button onClick={stopAndSave} className="px-4 py-2 rounded-xl bg-red-600 text-white hover:bg-red-700">
+                        End Session
                     </button>
                 )}
             </div>
