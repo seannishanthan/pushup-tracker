@@ -296,13 +296,8 @@ function Dashboard() {
       // Fetch the user name and daily goal from API
       await fetchUserName();
 
-      // Fetch today's reps and other data
+      // Fetch today's reps and other data (this function handles all calculations)
       await fetchTodayReps();
-      await fetchAllTimeReps();
-      await fetchBestDay();
-      await fetchAppearanceStreak();
-      await fetchAvgPerSession();
-      await fetchRecentSessions();
     };
 
     // Fetch the user name and daily goal from API

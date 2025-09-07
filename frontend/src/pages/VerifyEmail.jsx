@@ -24,13 +24,15 @@ function VerifyEmail() {
         // If we have verification parameters, don't show error - these are being handled by App.jsx
         if (mode === 'verifyEmail' && oobCode) {
             console.log('🔄 Verification parameters detected on /verify page - ignoring');
+            setError(''); // Clear any previous errors
             return;
         }
 
-        if (errorParam) {
+        // Only set error if user is not already verified
+        if (errorParam && !(user && isVerified)) {
             setError(errorParam);
         }
-    }, [searchParams]);
+    }, [searchParams, user, isVerified]);
 
     // Countdown timer for resend button
     useEffect(() => {
@@ -46,9 +48,10 @@ function VerifyEmail() {
     // Check if user is already verified
     useEffect(() => {
         if (user && isVerified) {
-            setMessage('Email already verified! Redirecting to login...');
+            setError(''); // Clear any error state
+            setMessage('Email already verified! Redirecting to dashboard...');
             setTimeout(() => {
-                navigate('/login');
+                navigate('/');
             }, 2000);
         }
     }, [user, isVerified, navigate]);
@@ -68,10 +71,18 @@ function VerifyEmail() {
             });
 
             setMessage('New verification email sent! Please check your inbox.');
-            setResendCountdown(60); // 60 second cooldown
+            setResendCountdown(120); // 2 minute cooldown to avoid rate limits
         } catch (error) {
             console.error('Resend error:', error);
-            setError(error.message || 'Failed to resend verification email');
+
+            // Handle specific Firebase errors
+            if (error.code === 'auth/too-many-requests') {
+                setError('Too many requests. Please wait a few minutes before trying again.');
+            } else if (error.code === 'auth/user-disabled') {
+                setError('Your account has been disabled. Please contact support.');
+            } else {
+                setError(error.message || 'Failed to resend verification email');
+            }
         }
 
         setResendLoading(false);
@@ -107,6 +118,17 @@ function VerifyEmail() {
                             Click the verification link in your email to verify your account and access the dashboard.
                         </p>
 
+                        {resendCountdown > 0 && (
+                            <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg">
+                                <div className="text-sm font-medium">
+                                    Please wait before requesting another email
+                                </div>
+                                <div className="text-lg font-bold mt-1">
+                                    {Math.floor(resendCountdown / 60)}:{String(resendCountdown % 60).padStart(2, '0')}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="space-y-3">
                             <button
                                 onClick={handleResendVerification}
@@ -114,7 +136,8 @@ function VerifyEmail() {
                                 className="w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {resendLoading ? 'Sending...' :
-                                    resendCountdown > 0 ? `Resend link (${resendCountdown}s)` :
+                                    resendCountdown > 0 ?
+                                        'Please wait...' :
                                         'Resend verification email'}
                             </button>
                         </div>
