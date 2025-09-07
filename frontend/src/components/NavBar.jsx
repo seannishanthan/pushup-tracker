@@ -1,15 +1,21 @@
 import { Link } from 'react-router-dom';
-import { useAuthManager } from '../hooks/useAuthManager';
+import { useFirebaseAuth } from '../hooks/useFirebaseAuth';
+import { signOut } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 function NavBar() {
-    const { logout, isAuthenticated } = useAuthManager();
+    const { user, isAuthenticated } = useFirebaseAuth();
 
-    const handleLogout = () => {
-        logout(); // This will handle history replacement
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+        } catch (error) {
+            console.error('Error signing out:', error);
+        }
     };
 
     // Don't show navbar if user is not authenticated
-    if (!isAuthenticated()) {
+    if (!isAuthenticated) {
         return null;
     }
 

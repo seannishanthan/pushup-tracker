@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useAuthManager } from '../hooks/useAuthManager';
+import { Link, useNavigate } from 'react-router-dom';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 import { authAPI } from '../utils/api';
 
 
 function Register() {
-  const { login } = useAuthManager();
-  
+  const navigate = useNavigate();
+
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -21,19 +22,69 @@ function Register() {
     setError('');
 
     try {
-      console.log('Attempting registration with:', formData);
-      const response = await authAPI.register(formData);
-      console.log('Registration response:', response);
-      
-      // Use the auth manager login method after successful registration - only pass the token
-      login(response.data.token);
-            
-      console.log('Registration successful!', response.data);
+      if (!auth) {
+        throw new Error('Firebase not initialized. Please check your configuration.');
+      }
+
+      console.log('Attempting registration with:', formData.email);
+
+      // Create user with Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
+
+      console.log('User created successfully:', userCredential.user.uid);
+
+      // Send email verification
+      const continueUrl = import.meta.env.VITE_FB_CONTINUE_URL || `${window.location.origin}/`;
+
+      await sendEmailVerification(userCredential.user, {
+        url: continueUrl
+      });
+
+      console.log('Verification email sent');
+
+      // Create user profile in MongoDB
+      try {
+        await authAPI.createRegistrationProfile({
+          username: formData.username,
+          email: formData.email
+        });
+        console.log('User profile created in database during registration');
+      } catch (profileError) {
+        console.error('Failed to create user profile during registration:', profileError);
+        // Don't fail the registration if profile creation fails
+        // User can still log in and profile will be created on first login
+      }
+
+      // Navigate to verification page
+      navigate(`/verify?email=${encodeURIComponent(formData.email)}`);
+
     } catch (error) {
       console.error('Registration error:', error);
-      setError(error.response?.data?.message || 'Registration failed');
+
+      // Handle Firebase-specific errors
+      let errorMessage = 'Registration failed';
+
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'Email is already registered';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'Password is too weak';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address';
+          break;
+        default:
+          errorMessage = error.message;
+      }
+
+      setError(errorMessage);
     }
-    
+
     setLoading(false);
   };
 
@@ -52,14 +103,14 @@ function Register() {
             Create your account
           </h2>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}
             </div>
           )}
-          
+
           <div className="space-y-4">
             <div>
               <label htmlFor="username" className="block text-sm font-medium text-gray-700">
@@ -76,7 +127,7 @@ function Register() {
                 placeholder="Enter your username"
               />
             </div>
-            
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email
@@ -92,7 +143,7 @@ function Register() {
                 placeholder="Enter your email"
               />
             </div>
-            
+
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                 Password
@@ -119,7 +170,7 @@ function Register() {
               {loading ? 'Creating account...' : 'Create account'}
             </button>
           </div>
-          
+
           <div className="text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{' '}

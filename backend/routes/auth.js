@@ -1,154 +1,126 @@
 const express = require('express');
-const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const authenticateToken = require('../middleware/auth');
+const requireAuth = require('../middleware/firebaseAuth');
+const { admin } = require('../config/firebaseAdmin');
 const router = express.Router();
 
-// An auth route is part of backend that handles user login/registration
-// url paths that frontend talks to when user wants to login/register/get their profile
-
-// Function to generate JWT token
-const generateToken = (userId) => {
-    return jwt.sign(
-        { userId },
-        process.env.JWT_SECRET,
-        { expiresIn: '1h' } // Token expires in 1 hour
-    );
-}
-
-
-// this route will be called when user wants to register
-// it will create/POST a new user in the database and return a JWT token
-router.post('/register', async (req, res) => {
+// Create user profile during registration (before email verification)
+router.post('/register-profile', async (req, res) => {
     try {
-        // Read user data from request body
-        const { username, email, password } = req.body;
+        console.log('🔄 Registration profile creation request');
 
-        // Check if all required fields are provided, if not return 400 which means bad request
-        if (!username || !email || !password) {
-            return res.status(400).json({
-                message: 'Please provide all required fields: username, email, password',
-                success: false
+        const authHeader = req.headers.authorization;
+        if (!authHeader?.startsWith('Bearer ')) {
+            return res.status(401).json({
+                success: false,
+                message: 'No token provided'
             });
         }
 
-        // Check if user already exists by looking for database entry with same email or username and return the user entry if it exists
-        const existingUser = await User.findOne({
-            $or: [{ email: email.toLowerCase() }, { username }]
-        })
+        const idToken = authHeader.split('Bearer ')[1];
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
 
-        // if user already exists, return 400 which means bad request
+        console.log('👤 Creating profile for user:', decodedToken.uid, 'Email:', decodedToken.email);
+        console.log('👤 Request body:', req.body);
+
+        const { username } = req.body;
+
+        // Check if user profile already exists
+        const existingUser = await User.findOne({ uid: decodedToken.uid });
         if (existingUser) {
+            console.log('❌ Profile already exists for user:', decodedToken.uid);
             return res.status(400).json({
-                message: existingUser.email === email.toLowerCase() ? 'Email already exists' : 'Username already exists',
+                message: 'User profile already exists',
                 success: false
             });
         }
 
-        // Create new user if it does not exist yet
-        const user = new User({
-            username,
-            email: email.toLowerCase(),
-            password
+        // Create new user profile (without email verification requirement)
+        const newUser = new User({
+            uid: decodedToken.uid,
+            username: username || decodedToken.email.split('@')[0],
+            email: decodedToken.email,
+            dailyGoal: 50
         });
 
-        // await because we want to wait for the user to be saved to the database before proceeding to generate the token
-        await user.save(); // Save user to database
+        await newUser.save();
+        console.log('✅ Registration profile created successfully for user:', decodedToken.uid, 'with username:', newUser.username);
 
-        const token = generateToken(user._id);
-
-        // Return success response with token only
         res.status(201).json({
             success: true,
-            message: 'Account created successfully!',
-            token
+            user: newUser.getPublicProfile(),
+            message: 'User profile created successfully during registration'
         });
-
-
     } catch (error) {
-        console.error('Registration error:', error);
-
-        // Handle invalid email format
-        if (error.name === 'ValidationError') {
-
-            // Return an array of error messages for each field that failed validation
-            const errors = Object.values(error.errors).map(err => err.message);
-
-            return res.status(400).json({
-                success: false,
-                message: 'Validation error',
-                errors
-            });
-        }
-
+        console.error('Registration profile creation error:', error);
         res.status(500).json({
-            message: 'Server error during registration',
+            message: 'Server error while creating user profile during registration',
             success: false
         });
     }
 });
 
-router.post('/login', async (req, res) => {
+// Create user profile after Firebase registration
+router.post('/profile', requireAuth, async (req, res) => {
     try {
-        const { email, password } = req.body;
+        console.log('👤 Profile creation request for user:', req.user.uid);
+        console.log('👤 Request body:', req.body);
 
-        // Check if email and password are provided
-        if (!email || !password) {
+        const { username, email } = req.body;
+
+        // Check if user profile already exists
+        const existingUser = await User.findOne({ uid: req.user.uid });
+        if (existingUser) {
+            console.log('❌ Profile already exists for user:', req.user.uid);
             return res.status(400).json({
-                message: 'Please provide both email and password',
+                message: 'User profile already exists',
                 success: false
             });
         }
 
-        // Find user in database by email
-        const user = await User.findOne({ email: email.toLowerCase() });
-
-        // If user not found, return 401 which means unauthorized
-        if (!user) {
-            return res.status(401).json({
-                message: 'Invalid email or password',
-                success: false
-            });
-        }
-
-        const isPasswordValid = await user.comparePassword(password);
-
-        if (!isPasswordValid) {
-            return res.status(401).json({
-                message: 'Invalid email or password',
-                success: false
-            });
-        }
-
-        const token = generateToken(user._id);
-
-        // Return token only
-        res.status(200).json({
-            success: true,
-            message: 'Login successful',
-            token
+        // Create new user profile
+        const newUser = new User({
+            uid: req.user.uid,
+            username: username || req.user.email.split('@')[0], // Default username from email
+            email: req.user.email,
+            dailyGoal: 50 // Default daily goal
         });
 
-    } catch (error) {
-        console.error('Login error:', error);
+        await newUser.save();
+        console.log('✅ Profile created successfully for user:', req.user.uid, 'with username:', newUser.username);
 
-        // Return 500 which means internal server error
+        res.status(201).json({
+            success: true,
+            user: newUser.getPublicProfile(),
+            message: 'User profile created successfully'
+        });
+    } catch (error) {
+        console.error('User creation error:', error);
         res.status(500).json({
-            success: false,
-            message: 'Server error during login'
+            message: 'Server error while creating user profile',
+            success: false
         });
     }
 });
 
-// Route to handle fetching user profile, authenticateToken is middleware that checks if user is authenticated before we return the profile
-router.get('/profile', authenticateToken, async (req, res) => {
+// Profile endpoint - get user profile with stats
+router.get('/profile', requireAuth, async (req, res) => {
     try {
+        console.log('📋 Profile request for user:', req.user.uid);
+        console.log('📋 User profile found:', !!req.user.profile);
+
+        // Check if user profile exists
+        if (!req.user.profile) {
+            return res.status(404).json({
+                success: false,
+                message: 'User profile not found. Please create your profile first.'
+            });
+        }
+
         res.json({
             success: true,
-            user: req.user // Get public profile (password excluded for security)
+            user: req.user.profile.getPublicProfile()
         });
-
-
     } catch (error) {
         console.error('Profile fetch error:', error);
         res.status(500).json({
@@ -159,7 +131,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
 });
 
 // Route to update user's daily goal
-router.put('/profile/goal', authenticateToken, async (req, res) => {
+router.put('/profile/goal', requireAuth, async (req, res) => {
     try {
         const { dailyGoal } = req.body;
 
@@ -172,8 +144,8 @@ router.put('/profile/goal', authenticateToken, async (req, res) => {
         }
 
         // Update the user's daily goal
-        const updatedUser = await User.findByIdAndUpdate(
-            req.user.id,
+        const updatedUser = await User.findOneAndUpdate(
+            { uid: req.user.uid },
             { dailyGoal: parseInt(dailyGoal) },
             { new: true } // Return the updated user
         );
@@ -198,6 +170,62 @@ router.put('/profile/goal', authenticateToken, async (req, res) => {
             success: false
         });
     }
+});
+
+// Route to update user's username
+router.put('/profile/username', requireAuth, async (req, res) => {
+    try {
+        const { username } = req.body;
+
+        // Validate the username
+        if (!username || username.trim().length < 3) {
+            return res.status(400).json({
+                message: 'Username must be at least 3 characters long',
+                success: false
+            });
+        }
+
+        // Update the user's username
+        const updatedUser = await User.findOneAndUpdate(
+            { uid: req.user.uid },
+            { username: username.trim() },
+            { new: true } // Return the updated user
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({
+                message: 'User not found',
+                success: false
+            });
+        }
+
+        res.json({
+            success: true,
+            user: updatedUser.getPublicProfile(),
+            message: 'Username updated successfully'
+        });
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({
+                message: 'Username already taken',
+                success: false
+            });
+        }
+        console.error('Update username error:', error);
+        res.status(500).json({
+            message: 'Server error while updating username',
+            success: false
+        });
+    }
+});
+
+// Health check endpoint for authentication
+router.get('/check', requireAuth, (req, res) => {
+    res.json({
+        success: true,
+        message: 'Authentication valid',
+        uid: req.user.uid
+    });
 });
 
 module.exports = router;

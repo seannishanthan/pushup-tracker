@@ -1,9 +1,14 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs'); //library to hash password so if hacker gets access to database, they can't see the password
 
 //here we define the schema (blueprint, class definition) for the User model (instance of the class)
 
 const userSchema = new mongoose.Schema({
+    uid: {
+        type: String,
+        required: [true, 'Firebase UID is required'],
+        unique: true,
+        trim: true
+    },
     username: {
         type: String,
         required: [true, 'Username is required'], //required field, if not provided, will throw an error with this message
@@ -18,12 +23,7 @@ const userSchema = new mongoose.Schema({
         unique: true,
         trim: true,
         lowercase: true, //convert to lowercase
-        match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email'] //regex to validate email format, will later send email to user to verify
-    },
-    password: {
-        type: String,
-        required: [true, 'Password is required'],
-        minlength: [6, 'Password must be at least 6 characters long'],
+        match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email'] //regex to validate email format
     },
     createdAt: {
         type: Date,
@@ -43,34 +43,11 @@ const userSchema = new mongoose.Schema({
     }
 });
 
-// before we save the user to the database, we want to hash the password for security
-// this is a middleware function that runs before the save operation (runs in between the request and response)
-// the request is the user object being saved and the response is the user object with the hashed password
-userSchema.pre('save', async function (next) {
-
-    if (!this.isModified('password')) return next(); //if password is not modified, skip hashing
-
-    try {
-        // hash password with salt and call next middleware function
-        const salt = await bcrypt.genSalt(12);
-        this.password = await bcrypt.hash(this.password, salt);
-        next();
-
-    } catch (error) {
-        return next(error); //if there is an error, pass it to the next middleware
-    }
-
-});
-
-// method of User schema to compare the candidate password entered by user with the hashed password in the database (this.password)
-userSchema.methods.comparePassword = async function (candidatePassword) {
-    return await bcrypt.compare(candidatePassword, this.password);
-};
-
-// a model instance method to get the user data without the password field
+// a model instance method to get the user data without sensitive fields
 userSchema.methods.getPublicProfile = function () {
     return {
         id: this._id, //every mongoose document (User / row in database) has an _id field built in
+        uid: this.uid, // Firebase UID
         username: this.username,
         email: this.email,
         createdAt: this.createdAt,

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import NavBar from "../components/NavBar";
 import { authAPI, pushupAPI } from '../utils/api';
+import { auth } from '../lib/firebase';
 
 
 // Sparkline component with empty state handling
@@ -269,15 +270,40 @@ function Dashboard() {
   };
 
   useEffect(() => {
-    // Set current date
-    const today = new Date();
-    const options = {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    // Force refresh Firebase auth state if user just verified email
+    const initializeDashboard = async () => {
+      // Check if we're coming from email verification (force refresh auth state)
+      if (auth?.currentUser) {
+        try {
+          await auth.currentUser.reload();
+          console.log('🔄 Dashboard: Refreshed Firebase auth state');
+          console.log('📧 Email verified:', auth.currentUser.emailVerified);
+        } catch (error) {
+          console.error('Error refreshing auth state:', error);
+        }
+      }
+
+      // Set current date
+      const today = new Date();
+      const options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      };
+      setCurrentDate(today.toLocaleDateString('en-US', options));
+
+      // Fetch the user name and daily goal from API
+      await fetchUserName();
+
+      // Fetch today's reps and other data
+      await fetchTodayReps();
+      await fetchAllTimeReps();
+      await fetchBestDay();
+      await fetchAppearanceStreak();
+      await fetchAvgPerSession();
+      await fetchRecentSessions();
     };
-    setCurrentDate(today.toLocaleDateString('en-US', options));
 
     // Fetch the user name and daily goal from API
     const fetchUserName = async () => {
@@ -305,6 +331,23 @@ function Dashboard() {
         }
       } catch (err) {
         console.error('Error fetching user name:', err);
+        console.error('Response status:', err.response?.status);
+        console.error('Response data:', err.response?.data);
+
+        // If profile doesn't exist (404), try to create it
+        if (err.response?.status === 404) {
+          console.log('Profile not found, attempting to create...');
+          try {
+            const createResponse = await authAPI.createProfile({
+              username: 'User' // Default username, user can change later
+            });
+            console.log('Profile created:', createResponse.data);
+            // Retry fetching the profile
+            setTimeout(() => fetchUserName(), 1000);
+          } catch (createErr) {
+            console.error('Error creating profile:', createErr);
+          }
+        }
         // Keep default 'User' if API call fails
       }
     };
@@ -633,8 +676,10 @@ function Dashboard() {
         setGoalStreakData('Start your goal streak!');
         setGoalStreakColor('red');
       }
-    }; fetchUserName();
-    fetchTodayReps();
+    };
+
+    // Initialize dashboard
+    initializeDashboard();
   }, []);
 
   const handleEditGoal = async () => {

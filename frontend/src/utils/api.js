@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { auth } from '../lib/firebase';
 
 // If in production mode return the production API URL
 // This is controlled by npm run dev versus npm run build (production)
@@ -9,13 +10,15 @@ const api = axios.create({
     baseURL: API_URL,
 });
 
-// Add JWT token to every request if it exists in localStorage
-// config is the request configuration object that axios uses to make the request
-// it is called config because it contains all the configuration options for the request like method, url, headers, data, params, etc.
-api.interceptors.request.use(config => {
-    const token = localStorage.getItem('token'); // Get token from localStorage
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`; // Set Authorization header
+// Add Firebase ID token to every request if user is authenticated
+api.interceptors.request.use(async (config) => {
+    if (auth?.currentUser) {
+        try {
+            const token = await auth.currentUser.getIdToken(); // auto-refreshed by Firebase
+            config.headers.Authorization = `Bearer ${token}`;
+        } catch (error) {
+            console.error('Failed to get Firebase ID token:', error);
+        }
     }
     return config;
 });
@@ -26,24 +29,23 @@ api.interceptors.response.use(
     (error) => {
         // Handle authentication errors
         if (error.response?.status === 401) {
-            // Clear invalid token
-            localStorage.removeItem('token');
-
-            // Redirect to login if not already there
-            if (window.location.pathname !== '/login') {
-                window.location.href = '/login';
-            }
+            // For 401 errors, we'll let the Firebase auth state handle redirects
+            console.warn('Authentication failed - user may need to re-login');
         }
         return Promise.reject(error);
     }
 );
 
-// Authentication API
+// Authentication API - now handled by Firebase Auth
 export const authAPI = {
-    register: (userData) => api.post('/auth/register', userData),
-    login: (userData) => api.post('/auth/login', userData),
-    getProfile: () => api.get('/auth/profile'), // Add this to fetch user profile from react frontend (user cant enter this in browser to access data)
-    updateDailyGoal: (dailyGoal) => api.put('/auth/profile/goal', { dailyGoal }), // Update user's daily goal
+    // Profile endpoints still go through our backend
+    createProfile: (userData) => api.post('/auth/profile', userData),
+    createRegistrationProfile: (userData) => api.post('/auth/register-profile', userData),
+    getProfile: () => api.get('/auth/profile'),
+    updateDailyGoal: (dailyGoal) => api.put('/auth/profile/goal', { dailyGoal }),
+    updateUsername: (username) => api.put('/auth/profile/username', { username }),
+    // Health check for auth
+    checkAuth: () => api.get('/auth/check'),
 };
 
 // Pushup Sessions API

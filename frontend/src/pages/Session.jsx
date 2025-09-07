@@ -45,7 +45,7 @@ function Session() {
         count: 0,
         phase: 'setup',             // setup -> waiting -> down -> holding -> up -> waiting
         downStartTime: null,        // When we entered down position
-        requiredHoldTime: 120,      // Minimum hold time (120ms)
+        requiredHoldTime: 300,      // Minimum hold time (300ms)
         armAngleThreshold: { up: 130, down: 120, upExit: 125, downExit: 125 }, // Hysteresis thresholds
         setupStartTime: null,       // When setup phase started
         setupDuration: 5000,        // 5 second setup period

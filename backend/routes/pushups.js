@@ -1,17 +1,17 @@
 const express = require('express');
 const PushupSession = require('../models/PushupSession');
-const authenticateToken = require('../middleware/auth');
+const requireAuth = require('../middleware/firebaseAuth');
 const validateSession = require('../middleware/pushups');
 const router = express.Router();
 
-// Run JWT auth middleware for all routes
-router.use(authenticateToken);
+// Run Firebase auth middleware for all routes
+router.use(requireAuth);
 
 // route to create a new pushup session
 router.post('/', validateSession, async (req, res) => {
     try {
         const { count, startedAt, endedAt, durationSec, notes } = req.body;
-        const userId = req.user.id; // req.user is attached by JWT middleware
+        const userId = req.user.profile._id; // Get user profile ID from Firebase auth middleware
 
         // Set default times if not provided
         const now = new Date();
@@ -48,7 +48,7 @@ router.post('/', validateSession, async (req, res) => {
 // GET /api/pushups - List recent sessions with pagination
 router.get('/', async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.user.profile._id; // Get user profile ID from Firebase auth middleware
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
         const skip = (page - 1) * limit; // number of records to skip to fetch the correct page from db
@@ -94,7 +94,7 @@ router.get('/', async (req, res) => {
 // GET /api/pushups/stats - Get user statistics
 router.get('/stats', async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.user.profile._id; // Get user profile ID from Firebase auth middleware
         const dailyGoal = parseInt(req.query.dailyGoal) || 100;
 
         // async static function to get user stats from model
@@ -118,7 +118,7 @@ router.get('/stats', async (req, res) => {
 // GET /api/pushups/:id - Get specific session
 router.get('/:id', async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.user.profile._id; // Get user profile ID from Firebase auth middleware
         const sessionId = req.params.id;
 
         const session = await PushupSession.findOne({
@@ -151,7 +151,7 @@ router.get('/:id', async (req, res) => {
 // PUT /api/pushups/:id - Update specific session
 router.put('/:id', validateSession, async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.user.profile._id; // Get user profile ID from Firebase auth middleware
         const sessionId = req.params.id;
         const { count, startedAt, endedAt, notes } = req.body;
 
@@ -194,7 +194,7 @@ router.put('/:id', validateSession, async (req, res) => {
 // DELETE /api/pushups/:id - Delete specific session
 router.delete('/:id', async (req, res) => {
     try {
-        const userId = req.user.id;
+        const userId = req.user.profile._id; // Get user profile ID from Firebase auth middleware
         const sessionId = req.params.id;
 
         const session = await PushupSession.findOneAndDelete({
