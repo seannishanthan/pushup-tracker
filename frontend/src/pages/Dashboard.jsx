@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import NavBar from "../components/NavBar";
 import { authAPI, pushupAPI } from '../utils/api';
 import { auth } from '../lib/firebase';
+import { useFirebaseAuth } from '../hooks/useFirebaseAuth';
 
 
 // Sparkline component with empty state handling
@@ -146,6 +147,7 @@ const WeeklyChart = ({ data, labels }) => {
 };
 
 function Dashboard() {
+  const { user, isVerified } = useFirebaseAuth(); // Add Firebase auth hook
   const [userName, setUserName] = useState('User'); // State for real user name
   const [todayReps, setTodayReps] = useState(0); // State for real today's reps
   const [todayRepsData, setTodayRepsData] = useState([]); // State for sparkline data
@@ -269,6 +271,49 @@ function Dashboard() {
     console.log('Goal streak message:', goalStreakMessage);
   };
 
+  // Fetch the user name and daily goal from API
+  const fetchUserName = async () => {
+    try {
+      console.log('📋 Fetching user profile...');
+      const userResponse = await authAPI.getProfile();
+
+      // The correct response structure is: Axios wraps it as { data: { success: true, user: { username, email, ... } } }
+      let name = null;
+      if (userResponse?.data?.user?.username) {
+        name = userResponse.data.user.username;
+      } else if (userResponse?.data?.user?.name) {
+        name = userResponse.data.user.name;
+      }
+
+      if (name) {
+        console.log('✅ User name loaded:', name);
+        setUserName(name);
+      } else {
+        console.log('⚠️ No username found in profile, using default');
+        setUserName('User');
+      }
+
+      // Get daily goal from user profile
+      if (userResponse?.data?.user?.dailyGoal) {
+        console.log('✅ Daily goal loaded:', userResponse.data.user.dailyGoal);
+        setDailyGoal(userResponse.data.user.dailyGoal);
+      } else {
+        // If user doesn't have a daily goal set, use default
+        console.log('⚠️ No daily goal found, using default: 50');
+        setDailyGoal(50);
+      }
+    } catch (err) {
+      console.error('❌ Error fetching user profile:', err);
+      console.error('Response status:', err.response?.status);
+      console.error('Response data:', err.response?.data);
+
+      // Backend should now auto-create profiles, so this should rarely happen
+      // Keep defaults if API call fails
+      setUserName('User');
+      setDailyGoal(50);
+    }
+  };
+
   useEffect(() => {
     // Force refresh Firebase auth state if user just verified email
     const initializeDashboard = async () => {
@@ -298,49 +343,6 @@ function Dashboard() {
 
       // Fetch today's reps and other data (this function handles all calculations)
       await fetchTodayReps();
-    };
-
-    // Fetch the user name and daily goal from API
-    const fetchUserName = async () => {
-      try {
-        console.log('📋 Fetching user profile...');
-        const userResponse = await authAPI.getProfile();
-
-        // The correct response structure is: Axios wraps it as { data: { success: true, user: { username, email, ... } } }
-        let name = null;
-        if (userResponse?.data?.user?.username) {
-          name = userResponse.data.user.username;
-        } else if (userResponse?.data?.user?.name) {
-          name = userResponse.data.user.name;
-        }
-
-        if (name) {
-          console.log('✅ User name loaded:', name);
-          setUserName(name);
-        } else {
-          console.log('⚠️ No username found in profile, using default');
-          setUserName('User');
-        }
-
-        // Get daily goal from user profile
-        if (userResponse?.data?.user?.dailyGoal) {
-          console.log('✅ Daily goal loaded:', userResponse.data.user.dailyGoal);
-          setDailyGoal(userResponse.data.user.dailyGoal);
-        } else {
-          // If user doesn't have a daily goal set, use default
-          console.log('⚠️ No daily goal found, using default: 50');
-          setDailyGoal(50);
-        }
-      } catch (err) {
-        console.error('❌ Error fetching user profile:', err);
-        console.error('Response status:', err.response?.status);
-        console.error('Response data:', err.response?.data);
-
-        // Backend should now auto-create profiles, so this should rarely happen
-        // Keep defaults if API call fails
-        setUserName('User');
-        setDailyGoal(50);
-      }
     };
 
     // Fetch today's reps from user sessions
@@ -672,6 +674,29 @@ function Dashboard() {
     // Initialize dashboard
     initializeDashboard();
   }, []);
+
+  // Watch for verification status changes and refresh user data
+  useEffect(() => {
+    // Skip if still initializing or user not available
+    if (!user) return;
+
+    // If user just got verified, refresh their profile data
+    if (isVerified && userName === 'User') {
+      console.log('🔄 User verification status changed, refreshing profile data...');
+      
+      // Add a small delay to ensure backend has processed the verification
+      const refreshTimer = setTimeout(async () => {
+        try {
+          await fetchUserName();
+          console.log('✅ Profile data refreshed after verification');
+        } catch (error) {
+          console.error('Error refreshing profile after verification:', error);
+        }
+      }, 1000); // 1 second delay
+
+      return () => clearTimeout(refreshTimer);
+    }
+  }, [user, isVerified, userName]);
 
   const handleEditGoal = async () => {
     const newGoal = prompt('Enter your new daily goal:', dailyGoal.toString());
