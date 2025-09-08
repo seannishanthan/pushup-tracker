@@ -60,11 +60,11 @@ function EmailVerificationHandler() {
 
           let errorMessage = 'Failed to verify email. ';
           if (error.code === 'auth/invalid-action-code') {
-            errorMessage += 'The verification link has expired or been used already.';
+            errorMessage = 'This verification link is invalid or has already been used. Please request a new verification email.';
           } else if (error.code === 'auth/expired-action-code') {
-            errorMessage += 'The verification link has expired.';
+            errorMessage = 'This verification link has expired. Please request a new verification email.';
           } else {
-            errorMessage += 'The link may be invalid.';
+            errorMessage = 'Unable to verify email with this link. Please request a new verification email.';
           }
 
           // Redirect to verify page with error handling

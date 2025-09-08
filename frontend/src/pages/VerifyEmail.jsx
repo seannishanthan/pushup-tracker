@@ -31,6 +31,12 @@ function VerifyEmail() {
         // Only set error if user is not already verified
         if (errorParam && !(user && isVerified)) {
             setError(errorParam);
+            // If it's a verification link error, clear the error parameter from URL
+            if (errorParam.includes('verification link') || errorParam.includes('verify email')) {
+                const newParams = new URLSearchParams(searchParams);
+                newParams.delete('error');
+                window.history.replaceState({}, '', `${window.location.pathname}?${newParams.toString()}`);
+            }
         }
     }, [searchParams, user, isVerified]);
 
@@ -88,6 +94,28 @@ function VerifyEmail() {
         setResendLoading(false);
     };
 
+    const handleCheckVerification = async () => {
+        if (!auth?.currentUser) return;
+
+        try {
+            // Force refresh the user to get latest verification status
+            await auth.currentUser.reload();
+
+            if (auth.currentUser.emailVerified) {
+                setError('');
+                setMessage('Email verified! Redirecting to dashboard...');
+                setTimeout(() => {
+                    navigate('/');
+                }, 1500);
+            } else {
+                setError('Email not yet verified. Please check your email and click the verification link.');
+            }
+        } catch (error) {
+            console.error('Check verification error:', error);
+            setError('Unable to check verification status. Please try again.');
+        }
+    };
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
             <div className="max-w-md w-full space-y-8 p-8">
@@ -103,7 +131,12 @@ function VerifyEmail() {
                 <div className="mt-8 space-y-6">
                     {error && (
                         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                            {error}
+                            <div className="font-medium">{error}</div>
+                            {(error.includes('verification link') || error.includes('verify email')) && (
+                                <div className="text-sm mt-2">
+                                    💡 Tip: Use the "Resend verification email" button below to get a fresh link.
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -115,7 +148,7 @@ function VerifyEmail() {
 
                     <div className="text-center space-y-4">
                         <p className="text-sm text-gray-600">
-                            Click the verification link in your email to verify your account and access the dashboard.
+                            Click the verification link in your email to verify your account and access the dashboard. Check your spam/junk folder as it might have been filtered there.
                         </p>
 
                         {resendCountdown > 0 && (
@@ -127,9 +160,14 @@ function VerifyEmail() {
                                     {Math.floor(resendCountdown / 60)}:{String(resendCountdown % 60).padStart(2, '0')}
                                 </div>
                             </div>
-                        )}
+                        )}                        <div className="space-y-3">
+                            <button
+                                onClick={handleCheckVerification}
+                                className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                            >
+                                I've Verified My Email
+                            </button>
 
-                        <div className="space-y-3">
                             <button
                                 onClick={handleResendVerification}
                                 disabled={resendLoading || resendCountdown > 0 || !auth?.currentUser}
@@ -141,15 +179,6 @@ function VerifyEmail() {
                                         'Resend verification email'}
                             </button>
                         </div>
-                    </div>
-
-                    <div className="text-center">
-                        <p className="text-sm text-gray-600">
-                            Remember your password?{' '}
-                            <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
-                                Back to Login
-                            </Link>
-                        </p>
                     </div>
                 </div>
             </div>
