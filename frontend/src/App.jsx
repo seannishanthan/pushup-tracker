@@ -41,13 +41,14 @@ function EmailVerificationHandler() {
           if (auth?.currentUser) {
             await auth.currentUser.reload();
             console.log('🔄 User auth state refreshed');
+            console.log('📧 Email verified:', auth.currentUser.emailVerified);
 
             // Force get a new ID token (this is crucial!)
             const newToken = await auth.currentUser.getIdToken(true);
             console.log('🔑 New ID token generated after verification');
 
-            // Small delay to ensure token propagation
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Longer delay to ensure token propagation and profile creation
+            await new Promise(resolve => setTimeout(resolve, 1500));
           }
 
           // The RequireAuth component will handle redirecting to dashboard

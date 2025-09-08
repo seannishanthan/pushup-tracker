@@ -303,6 +303,7 @@ function Dashboard() {
     // Fetch the user name and daily goal from API
     const fetchUserName = async () => {
       try {
+        console.log('📋 Fetching user profile...');
         const userResponse = await authAPI.getProfile();
 
         // The correct response structure is: Axios wraps it as { data: { success: true, user: { username, email, ... } } }
@@ -314,36 +315,31 @@ function Dashboard() {
         }
 
         if (name) {
+          console.log('✅ User name loaded:', name);
           setUserName(name);
+        } else {
+          console.log('⚠️ No username found in profile, using default');
+          setUserName('User');
         }
 
         // Get daily goal from user profile
         if (userResponse?.data?.user?.dailyGoal) {
+          console.log('✅ Daily goal loaded:', userResponse.data.user.dailyGoal);
           setDailyGoal(userResponse.data.user.dailyGoal);
         } else {
-          // If user doesn't have a daily goal set, use default and save it
-          setDailyGoal(20);
+          // If user doesn't have a daily goal set, use default
+          console.log('⚠️ No daily goal found, using default: 50');
+          setDailyGoal(50);
         }
       } catch (err) {
-        console.error('Error fetching user name:', err);
+        console.error('❌ Error fetching user profile:', err);
         console.error('Response status:', err.response?.status);
         console.error('Response data:', err.response?.data);
 
-        // If profile doesn't exist (404), try to create it
-        if (err.response?.status === 404) {
-          console.log('Profile not found, attempting to create...');
-          try {
-            const createResponse = await authAPI.createProfile({
-              username: 'User' // Default username, user can change later
-            });
-            console.log('Profile created:', createResponse.data);
-            // Retry fetching the profile
-            setTimeout(() => fetchUserName(), 1000);
-          } catch (createErr) {
-            console.error('Error creating profile:', createErr);
-          }
-        }
-        // Keep default 'User' if API call fails
+        // Backend should now auto-create profiles, so this should rarely happen
+        // Keep defaults if API call fails
+        setUserName('User');
+        setDailyGoal(50);
       }
     };
 

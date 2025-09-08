@@ -103,23 +103,32 @@ router.post('/profile', requireAuth, async (req, res) => {
     }
 });
 
-// Profile endpoint - get user profile with stats
+// Profile endpoint - get user profile with stats (auto-create if doesn't exist)
 router.get('/profile', requireAuth, async (req, res) => {
     try {
         console.log('📋 Profile request for user:', req.user.uid);
         console.log('📋 User profile found:', !!req.user.profile);
 
-        // Check if user profile exists
-        if (!req.user.profile) {
-            return res.status(404).json({
-                success: false,
-                message: 'User profile not found. Please create your profile first.'
+        let userProfile = req.user.profile;
+
+        // If user profile doesn't exist, auto-create it for verified users
+        if (!userProfile) {
+            console.log('🔄 Auto-creating profile for verified user:', req.user.uid);
+            
+            userProfile = new User({
+                uid: req.user.uid,
+                username: req.user.email.split('@')[0], // Default username from email
+                email: req.user.email,
+                dailyGoal: 50 // Default daily goal
             });
+
+            await userProfile.save();
+            console.log('✅ Auto-created profile for user:', req.user.uid, 'with username:', userProfile.username);
         }
 
         res.json({
             success: true,
-            user: req.user.profile.getPublicProfile()
+            user: userProfile.getPublicProfile()
         });
     } catch (error) {
         console.error('Profile fetch error:', error);
