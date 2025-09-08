@@ -21,14 +21,15 @@ function VerifyEmail() {
         const mode = searchParams.get('mode');
         const oobCode = searchParams.get('oobCode');
 
-        // If we have verification parameters, don't show error - these are being handled by App.jsx
+        // If we have verification parameters, show loading message and don't show errors
         if (mode === 'verifyEmail' && oobCode) {
-            console.log('🔄 Verification parameters detected on /verify page - ignoring');
+            console.log('🔄 Verification parameters detected on /verify page - processing...');
             setError(''); // Clear any previous errors
+            setMessage('Processing email verification...');
             return;
         }
 
-        // Only set error if user is not already verified
+        // Only set error if user is not already verified and no verification is in progress
         if (errorParam && !(user && isVerified)) {
             setError(errorParam);
             // If it's a verification link error, clear the error parameter from URL

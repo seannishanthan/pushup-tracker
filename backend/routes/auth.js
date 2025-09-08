@@ -114,7 +114,7 @@ router.get('/profile', requireAuth, async (req, res) => {
         // If user profile doesn't exist, auto-create it for verified users
         if (!userProfile) {
             console.log('🔄 Auto-creating profile for verified user:', req.user.uid);
-            
+
             userProfile = new User({
                 uid: req.user.uid,
                 username: req.user.email.split('@')[0], // Default username from email

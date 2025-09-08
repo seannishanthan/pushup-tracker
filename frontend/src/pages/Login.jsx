@@ -8,6 +8,7 @@ function Login() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const emailFromParams = searchParams.get('email') || '';
+    const verificationMessage = searchParams.get('message') || '';
     const { user, isVerified } = useFirebaseAuth();
 
     // when state variables are changed, the component will re-render on UI with the new values
@@ -24,6 +25,7 @@ function Login() {
     // state to show error messages if login fails
     const [error, setError] = useState('');
     const [showVerificationBanner, setShowVerificationBanner] = useState(false);
+    const [successMessage, setSuccessMessage] = useState(verificationMessage);
 
     // Redirect if already authenticated and verified
     useEffect(() => {
@@ -132,6 +134,13 @@ function Login() {
                             >
                                 ↻ I just verified, try again
                             </button>
+                        </div>
+                    )}
+
+                    {/* Success message for email verification */}
+                    {successMessage && (
+                        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                            {successMessage}
                         </div>
                     )}
 
