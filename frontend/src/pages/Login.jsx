@@ -60,6 +60,8 @@ function Login() {
             // If email is not verified, show appropriate message
             if (!userCredential.user.emailVerified) {
                 setError('Please verify your email address before logging in. Check your inbox for a verification link.');
+                // Redirect to verification page
+                navigate(`/verify?email=${encodeURIComponent(formData.email)}&message=Please verify your email to continue.`);
                 return;
             }
 
@@ -74,9 +76,13 @@ function Login() {
 
             switch (error.code) {
                 case 'auth/user-not-found':
+                    errorMessage = 'No account found with this email address. Please register first.';
+                    break;
                 case 'auth/wrong-password':
+                    errorMessage = 'Incorrect password. Please try again.';
+                    break;
                 case 'auth/invalid-credential':
-                    errorMessage = 'Invalid email or password';
+                    errorMessage = 'Invalid email or password. If you just registered, please verify your email first.';
                     break;
                 case 'auth/user-disabled':
                     errorMessage = 'This account has been disabled';

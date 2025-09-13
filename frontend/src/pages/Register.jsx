@@ -14,6 +14,7 @@ function Register() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -57,8 +58,24 @@ function Register() {
         // Don't fail the registration - profile will be created on first login
       }
 
-      // Navigate to verification page with success message
-      navigate(`/verify?email=${encodeURIComponent(formData.email)}&message=Registration successful! Please check your email for verification link.`);
+      // Store email for navigation before clearing form
+      const userEmail = formData.email;
+
+      // Show success state
+      setSuccess(true);
+      setLoading(false);
+
+      // Clear form data to prevent accidental re-submission
+      setFormData({
+        username: '',
+        email: '',
+        password: ''
+      });
+
+      // Navigate to verification page after a brief delay
+      setTimeout(() => {
+        navigate(`/verify?email=${encodeURIComponent(userEmail)}&message=Registration successful! Please check your email for verification link.`, { replace: true });
+      }, 2000);
 
     } catch (error) {
       console.error('❌ Registration error:', error);
@@ -109,6 +126,13 @@ function Register() {
         </div>
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          {success && (
+            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+              <div className="font-medium">Registration successful! 🎉</div>
+              <div className="text-sm mt-1">Please check your email for verification link. Redirecting to verification page...</div>
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
               {error}
@@ -168,10 +192,10 @@ function Register() {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || success}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
             >
-              {loading ? 'Creating account...' : 'Create account'}
+              {loading ? 'Creating account...' : success ? 'Account created! ✅' : 'Create account'}
             </button>
           </div>
 
