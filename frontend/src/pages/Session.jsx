@@ -593,6 +593,37 @@ function Session() {
         }
     };
 
+    const getVisibilityFeedback = () => {
+        const { kneeVis, ankleVis, upperBodyVis, visibility } = debugInfo;
+
+        // Check for low visibility landmarks
+        const lowKnees = kneeVis.filter(v => v < 0.5).length;
+        const lowAnkles = ankleVis.filter(v => v < 0.5).length;
+        const lowUpperBody = upperBodyVis.filter(v => v < 0.5).length;
+
+        if (visibility < 50) {
+            return "Move further back to get your full body in frame";
+        }
+
+        if (lowKnees > 0) {
+            return `Bring your ${lowKnees === 1 ? 'knee' : 'knees'} within the frame`;
+        }
+
+        if (lowAnkles > 0) {
+            return `Bring your ${lowAnkles === 1 ? 'ankle' : 'ankles'} within the frame`;
+        }
+
+        if (lowUpperBody > 2) {
+            return "Adjust your upper body position for better tracking";
+        }
+
+        if (visibility >= 80) {
+            return "Great positioning! All landmarks are clearly visible";
+        }
+
+        return "Good positioning, keep it up!";
+    };
+
     return (
         <div className="mx-auto max-w-4xl p-4">
             <button
@@ -615,62 +646,23 @@ function Session() {
                     <div className="text-sm text-green-800">Duration</div>
                 </div>
                 <div className="bg-purple-100 p-4 rounded-lg text-center">
-                    <div className={`text-sm font-semibold ${getPositionColor(currentPosition)}`}>
-                        {getPositionText(currentPosition)}
+                    <div className="text-sm font-semibold text-purple-800 mb-2">
+                        Current Phase: {pushupStateRef.current?.phase || 'waiting'}
+                        {pushupStateRef.current?.phase === 'setup' && pushupStateRef.current?.setupStartTime &&
+                            ` (${Math.max(0, Math.ceil((pushupStateRef.current.setupDuration - (Date.now() - pushupStateRef.current.setupStartTime)) / 1000))}s)`
+                        }
+                    </div>
+                    <div className="text-sm font-semibold text-purple-800">
+                        Arm Angle: {debugInfo.armAngle}°
                     </div>
                 </div>
             </div>
 
-            {/* Debug Information */}
+            {/* Landmark Visibility Feedback */}
             {status === 'running' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-xs">
-                    <div className="bg-gray-100 p-2 rounded text-center">
-                        <div className="font-semibold">Arm Angle</div>
-                        <div className={debugInfo.armAngle <= 120 ? 'text-blue-600 font-bold' : 'text-gray-600'}>
-                            {debugInfo.armAngle}°
-                        </div>
-                    </div>
-                    <div className="bg-gray-100 p-2 rounded text-center">
-                        <div className="font-semibold">Current Phase</div>
-                        <div className="text-xs">
-                            <div className={
-                                pushupStateRef.current?.phase === 'setup' ? 'text-orange-600 font-bold' :
-                                    pushupStateRef.current?.phase === 'down' ? 'text-blue-600 font-bold' :
-                                        'text-gray-400'
-                            }>
-                                {pushupStateRef.current?.phase || 'waiting'}
-                                {pushupStateRef.current?.phase === 'setup' && pushupStateRef.current?.setupStartTime &&
-                                    ` (${Math.max(0, Math.ceil((pushupStateRef.current.setupDuration - (Date.now() - pushupStateRef.current.setupStartTime)) / 1000))}s)`
-                                }
-                            </div>
-                        </div>
-                    </div>
-                    <div className="bg-gray-100 p-2 rounded text-center">
-                        <div className="font-semibold">Hold Time</div>
-                        <div className={pushupStateRef.current?.downStartTime ? 'text-orange-600 font-bold' : 'text-gray-400'}>
-                            {pushupStateRef.current?.downStartTime ?
-                                `${Math.max(0, Date.now() - pushupStateRef.current.downStartTime)}ms` :
-                                '0ms'
-                            }
-                        </div>
-                    </div>
-                    <div className="bg-gray-100 p-2 rounded text-center">
-                        <div className="font-semibold">Full Body Visibility</div>
-                        <div>{debugInfo.visibility}%</div>
-                    </div>
-                    <div className="bg-gray-100 p-2 rounded text-left col-span-1 md:col-span-2">
-                        <div className="font-semibold mb-1">Landmark Visibilities</div>
-                        <div className="flex flex-wrap gap-2 justify-center">
-                            <div className="bg-blue-50 rounded px-2 py-1">
-                                <span className="font-semibold">Knees:</span> {debugInfo.kneeVis.map((v, i) => `K${i + 1}: ${(v * 100).toFixed(0)}%`).join(' | ')}
-                            </div>
-                            <div className="bg-blue-50 rounded px-2 py-1">
-                                <span className="font-semibold">Ankles:</span> {debugInfo.ankleVis.map((v, i) => `A${i + 1}: ${(v * 100).toFixed(0)}%`).join(' | ')}
-                            </div>
-                            <div className="bg-blue-50 rounded px-2 py-1">
-                                <span className="font-semibold">Upper Body:</span> {debugInfo.upperBodyVis.map((v, i) => `UB${i + 1}: ${(v * 100).toFixed(0)}%`).join(' | ')}
-                            </div>
-                        </div>
+                <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <div className="text-sm text-yellow-800">
+                        <strong>Visibility Check:</strong> {getVisibilityFeedback()}
                     </div>
                 </div>
             )}
@@ -741,31 +733,21 @@ function Session() {
                 )}
             </div>
 
-            {/* Instructions */}
+            {/* Instructions - Only show when idle (before starting session) */}
             {status === 'idle' && (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                    <h3 className="font-semibold mb-2 text-blue-800">Camera Preview - Position Yourself:</h3>
+                    <h3 className="font-semibold mb-2 text-blue-800">Tips for a good session:</h3>
                     <ul className="text-sm space-y-1 text-blue-700">
-                        <li>• <strong>Camera preview is active</strong> - position yourself now!</li>
-                        <li>• Position yourself <strong>sideways</strong> to the camera (profile view)</li>
+                        <li>• Position yourself <strong>sideways</strong> to the camera, you should see green edges and red nodes on your body once tracking starts</li>
                         <li>• Make sure your <strong>full body from head to toe</strong> is visible in frame</li>
                         <li>• Ensure good lighting on the side facing the camera</li>
                         <li>• Do <strong>slow, controlled</strong> push-ups for accurate counting</li>
-                        <li>• <strong>Hold at the bottom</strong> for at least 120ms to count the rep</li>
-                        <li>• You should see <strong>green lines and red dots</strong> on your body when tracking starts</li>
+                        <li>• <strong>Hold at the bottom</strong> for ~300ms to count the rep</li>
                         <li>• Watch arm angle: <strong>130°+ = Up</strong>, <strong>120°- = Down</strong></li>
                     </ul>
                 </div>
             )}
 
-            {status === 'running' && (
-                <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
-                    <p className="text-sm text-green-700">
-                        <strong>Tip:</strong> The arm angle will show in <strong className="text-blue-600">blue</strong> when in down position (≤120°).
-                        You must <strong>hold at the bottom for 120ms</strong> before going up to count the rep!
-                    </p>
-                </div>
-            )}
         </div>
 
     );

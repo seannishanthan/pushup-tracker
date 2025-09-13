@@ -894,7 +894,7 @@ function Dashboard() {
               color="#3b82f6"
             />
             <StatCard
-              title="All-timeDdddd"
+              title="All-time"
               value={allTimeReps.toLocaleString()}
               data={allTimeRepsData} // Real cumulative sparkline data
               color="#f59e0b"
