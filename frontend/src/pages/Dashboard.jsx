@@ -436,6 +436,9 @@ function Dashboard() {
         const userDailyGoal = userResponse?.data?.user?.dailyGoal || 20;
         console.log('👤 User daily goal:', userDailyGoal);
 
+        // Ensure daily goal is set in state
+        setDailyGoal(userDailyGoal);
+
         const sessionsResponse = await pushupAPI.list();
         console.log('📊 Raw API response:', sessionsResponse);
 
@@ -891,7 +894,7 @@ function Dashboard() {
               color="#3b82f6"
             />
             <StatCard
-              title="All-time"
+              title="All-timeDdddd"
               value={allTimeReps.toLocaleString()}
               data={allTimeRepsData} // Real cumulative sparkline data
               color="#f59e0b"
