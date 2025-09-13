@@ -273,6 +273,28 @@ function Dashboard() {
     console.log('Goal streak message:', goalStreakMessage);
   };
 
+  // Fetch user name with retry logic for mobile Safari
+  const fetchUserNameWithRetry = async (maxRetries = 1) => {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        console.log(`📋 Fetching user profile... (attempt ${attempt + 1}/${maxRetries})`);
+        const success = await fetchUserName(attempt);
+        if (success) {
+          console.log('✅ User profile loaded successfully');
+          return;
+        }
+      } catch (error) {
+        console.error(`❌ Attempt ${attempt + 1} failed:`, error);
+        if (attempt < maxRetries - 1) {
+          console.log(`⏳ Waiting before retry ${attempt + 2}...`);
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      }
+    }
+    console.log('⚠️ All attempts failed, using default name');
+    setUserName('User');
+  };
+
   // Fetch the user name and daily goal from API
   const fetchUserName = async (retryCount = 0) => {
     try {
@@ -307,6 +329,7 @@ function Dashboard() {
       } else {
         console.log('⚠️ No name found in profile, using default');
         setUserName('User');
+        return false; // Return false to indicate failure
       }
 
       // Get daily goal from user profile
@@ -318,6 +341,8 @@ function Dashboard() {
         console.log('⚠️ No daily goal found, using default: 50');
         setDailyGoal(50);
       }
+
+      return true; // Return true to indicate success
     } catch (err) {
       console.error('❌ Error fetching user profile:', err);
       console.error('Response status:', err.response?.status);
@@ -345,18 +370,25 @@ function Dashboard() {
       // Keep defaults if API call fails
       setUserName('User');
       setDailyGoal(50);
+      return false; // Return false to indicate failure
     }
   };
 
   useEffect(() => {
     // Force refresh Firebase auth state if user just verified email
     const initializeDashboard = async () => {
+      console.log('🚀 Initializing dashboard...');
+      console.log('📱 User agent:', navigator.userAgent);
+      console.log('🔍 Is mobile Safari:', /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent));
+
       // Check if we're coming from email verification (force refresh auth state)
       if (auth?.currentUser) {
         try {
+          console.log('🔄 Reloading Firebase user...');
           await auth.currentUser.reload();
           console.log('🔄 Dashboard: Refreshed Firebase auth state');
           console.log('📧 Email verified:', auth.currentUser.emailVerified);
+          console.log('👤 User UID:', auth.currentUser.uid);
 
           // Force get a fresh ID token to ensure backend gets updated verification status
           if (auth.currentUser.emailVerified) {
@@ -364,10 +396,13 @@ function Dashboard() {
             await auth.currentUser.getIdToken(true);
             // Clear token cache to ensure fresh tokens are used
             clearTokenCache();
+            console.log('✅ Fresh token obtained and cache cleared');
           }
         } catch (error) {
-          console.error('Error refreshing auth state:', error);
+          console.error('❌ Error refreshing auth state:', error);
         }
+      } else {
+        console.log('⚠️ No current user found in auth state');
       }
 
       // Set current date
@@ -380,14 +415,18 @@ function Dashboard() {
       };
       setCurrentDate(today.toLocaleDateString('en-US', options));
 
-      // Add a small delay to ensure token propagation after verification
-      if (auth?.currentUser?.emailVerified) {
+      // For mobile Safari, add extra delay and retry logic
+      const isMobileSafari = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent);
+      if (isMobileSafari && auth?.currentUser?.emailVerified) {
+        console.log('📱 Mobile Safari detected - adding extra delay for token propagation...');
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Longer delay for mobile
+      } else if (auth?.currentUser?.emailVerified) {
         console.log('⏳ Waiting for token propagation after verification...');
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
-      // Fetch the user name and daily goal from API
-      await fetchUserName(0);
+      // Fetch the user name and daily goal from API with retry logic for mobile
+      await fetchUserNameWithRetry(isMobileSafari ? 3 : 1);
 
       // Fetch today's reps and other data (this function handles all calculations)
       await fetchTodayReps();
@@ -757,6 +796,26 @@ function Dashboard() {
       return () => clearTimeout(refreshTimer);
     }
   }, [user, isVerified, userName]);
+
+  // Mobile Safari fallback: periodically retry loading profile if still showing "User"
+  useEffect(() => {
+    const isMobileSafari = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent);
+
+    if (isMobileSafari && user && isVerified && userName === 'User' && !isLoading) {
+      console.log('📱 Mobile Safari fallback: retrying profile load...');
+
+      const fallbackTimer = setTimeout(async () => {
+        try {
+          console.log('🔄 Fallback retry: fetching user profile...');
+          await fetchUserName(0);
+        } catch (error) {
+          console.error('❌ Fallback retry failed:', error);
+        }
+      }, 3000); // 3 second delay
+
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [user, isVerified, userName, isLoading]);
 
   const handleEditGoal = async () => {
     const newGoal = prompt('Enter your new daily goal:', dailyGoal.toString());
