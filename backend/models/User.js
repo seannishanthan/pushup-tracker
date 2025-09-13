@@ -9,13 +9,19 @@ const userSchema = new mongoose.Schema({
         unique: true,
         trim: true
     },
-    username: {
+    name: {
         type: String,
-        required: [true, 'Username is required'], //required field, if not provided, will throw an error with this message
-        unique: true,
+        required: [true, 'Name is required'], //required field, if not provided, will throw an error with this message
         trim: true, //remove whitespace from beginning and end
-        minlength: [3, 'Username must be at least 3 characters long'],
-        maxlength: [20, 'Username must be at most 20 characters long']
+        minlength: [2, 'Name must be at least 2 characters long'],
+        maxlength: [50, 'Name must be at most 50 characters long'],
+        validate: {
+            validator: function (v) {
+                // Check that name has no spaces
+                return !/\s/.test(v);
+            },
+            message: 'Name cannot contain spaces'
+        }
     },
     email: {
         type: String,
@@ -43,12 +49,21 @@ const userSchema = new mongoose.Schema({
     }
 });
 
+// Pre-save middleware to format name consistently
+userSchema.pre('save', function (next) {
+    if (this.name && this.isModified('name')) {
+        // Format name: capitalize first letter, lowercase rest
+        this.name = this.name.charAt(0).toUpperCase() + this.name.slice(1).toLowerCase();
+    }
+    next();
+});
+
 // a model instance method to get the user data without sensitive fields
 userSchema.methods.getPublicProfile = function () {
     return {
         id: this._id, //every mongoose document (User / row in database) has an _id field built in
         uid: this.uid, // Firebase UID
-        username: this.username,
+        name: this.name,
         email: this.email,
         createdAt: this.createdAt,
         totalSessions: this.totalSessions,

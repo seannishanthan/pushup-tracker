@@ -8,13 +8,14 @@ function Register() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    username: '',
+    name: '',
     email: '',
     password: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [passwordStrength, setPasswordStrength] = useState('weak');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -24,6 +25,20 @@ function Register() {
     try {
       if (!auth) {
         throw new Error('Firebase not initialized. Please check your configuration.');
+      }
+
+      // Validate name
+      if (!formData.name || formData.name.trim().length < 2) {
+        throw new Error('Name must be at least 2 characters long');
+      }
+
+      if (/\s/.test(formData.name.trim())) {
+        throw new Error('Name cannot contain spaces');
+      }
+
+      // Validate password
+      if (!formData.password || formData.password.length < 6) {
+        throw new Error('Password must be at least 6 characters long');
       }
 
       console.log('🔐 Attempting registration with:', formData.email);
@@ -49,7 +64,7 @@ function Register() {
       // Create user profile in MongoDB (don't fail registration if this fails)
       try {
         await authAPI.createRegistrationProfile({
-          username: formData.username,
+          name: formData.name,
           email: formData.email
         });
         console.log('✅ User profile created in database during registration');
@@ -67,7 +82,7 @@ function Register() {
 
       // Clear form data to prevent accidental re-submission
       setFormData({
-        username: '',
+        name: '',
         email: '',
         password: ''
       });
@@ -109,11 +124,38 @@ function Register() {
     }
   };
 
+  // Format name: capitalize first letter, lowercase rest
+  const formatName = (name) => {
+    if (!name) return '';
+    return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  };
+
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+
+    // Format name field automatically
+    if (name === 'name') {
+      setFormData({
+        ...formData,
+        [name]: formatName(value)
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
+
+    // Update password strength indicator
+    if (name === 'password') {
+      if (value.length < 6) {
+        setPasswordStrength('weak');
+      } else if (value.length < 10) {
+        setPasswordStrength('medium');
+      } else {
+        setPasswordStrength('strong');
+      }
+    }
   };
 
   return (
@@ -141,19 +183,26 @@ function Register() {
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                Username
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                Name
               </label>
               <input
-                id="username"
-                name="username"
+                id="name"
+                name="name"
                 type="text"
                 required
-                value={formData.username}
+                value={formData.name}
                 onChange={handleChange}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your username"
+                placeholder="Enter your name"
+                minLength="2"
+                maxLength="50"
+                pattern="^[^\s]+$"
+                title="Name must be at least 2 characters and contain no spaces"
               />
+              <p className="mt-1 text-xs text-gray-500">
+                At least 2 characters, no spaces. Will be formatted automatically.
+              </p>
             </div>
 
             <div>
@@ -185,7 +234,33 @@ function Register() {
                 onChange={handleChange}
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 placeholder="Enter your password"
+                minLength="6"
+                title="Password must be at least 6 characters long"
               />
+              <div className="mt-1">
+                <p className="text-xs text-gray-500 mb-1">
+                  At least 6 characters required
+                </p>
+                {formData.password && (
+                  <div className="flex items-center space-x-1">
+                    <div className={`h-1 w-8 rounded ${passwordStrength === 'weak' ? 'bg-red-400' :
+                      passwordStrength === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
+                      }`}></div>
+                    <div className={`h-1 w-8 rounded ${passwordStrength === 'weak' ? 'bg-gray-200' :
+                      passwordStrength === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
+                      }`}></div>
+                    <div className={`h-1 w-8 rounded ${passwordStrength === 'weak' ? 'bg-gray-200' :
+                      passwordStrength === 'medium' ? 'bg-gray-200' : 'bg-green-400'
+                      }`}></div>
+                    <span className={`text-xs ml-2 ${passwordStrength === 'weak' ? 'text-red-600' :
+                      passwordStrength === 'medium' ? 'text-yellow-600' : 'text-green-600'
+                      }`}>
+                      {passwordStrength === 'weak' ? 'Weak' :
+                        passwordStrength === 'medium' ? 'Medium' : 'Strong'}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

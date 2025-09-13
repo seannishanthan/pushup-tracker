@@ -112,7 +112,7 @@ export const authAPI = {
     createRegistrationProfile: (userData) => api.post('/auth/register-profile', userData),
     getProfile: () => api.get('/auth/profile'),
     updateDailyGoal: (dailyGoal) => api.put('/auth/profile/goal', { dailyGoal }),
-    updateUsername: (username) => api.put('/auth/profile/username', { username }),
+    updateName: (name) => api.put('/auth/profile/name', { name }),
     // Health check for auth
     checkAuth: () => api.get('/auth/check'),
     // Debug endpoint

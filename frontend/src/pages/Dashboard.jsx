@@ -291,16 +291,13 @@ function Dashboard() {
         console.log('🔍 Debug profile failed:', debugError);
       }
 
-      // The correct response structure is: Axios wraps it as { data: { success: true, user: { username, email, ... } } }
+      // The correct response structure is: Axios wraps it as { data: { success: true, user: { name, email, ... } } }
       let name = null;
-      if (userResponse?.data?.user?.username) {
-        name = userResponse.data.user.username;
-        console.log('✅ Found username in response:', name);
-      } else if (userResponse?.data?.user?.name) {
+      if (userResponse?.data?.user?.name) {
         name = userResponse.data.user.name;
         console.log('✅ Found name in response:', name);
       } else {
-        console.log('⚠️ No username or name found in response');
+        console.log('⚠️ No name found in response');
         console.log('📋 Available user fields:', Object.keys(userResponse?.data?.user || {}));
       }
 
@@ -308,7 +305,7 @@ function Dashboard() {
         console.log('✅ User name loaded:', name);
         setUserName(name);
       } else {
-        console.log('⚠️ No username found in profile, using default');
+        console.log('⚠️ No name found in profile, using default');
         setUserName('User');
       }
 
@@ -1004,7 +1001,7 @@ function Dashboard() {
                           await pushupAPI.delete(session._id);
                           // Refresh dashboard data
                           const userResponse = await authAPI.getProfile();
-                          if (userResponse?.data?.user?.username) setUserName(userResponse.data.user.username);
+                          if (userResponse?.data?.user?.name) setUserName(userResponse.data.user.name);
                           if (userResponse?.data?.user?.dailyGoal) setDailyGoal(userResponse.data.user.dailyGoal);
                           // Re-fetch sessions
                           const sessionsResponse = await pushupAPI.list();

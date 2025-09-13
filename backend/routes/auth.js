@@ -23,7 +23,10 @@ router.post('/register-profile', async (req, res) => {
         console.log('👤 Creating profile for user:', decodedToken.uid, 'Email:', decodedToken.email);
         console.log('👤 Request body:', req.body);
 
-        const { username } = req.body;
+        const { name } = req.body;
+
+        // Format name: capitalize first letter, lowercase rest
+        const formattedName = name ? name.charAt(0).toUpperCase() + name.slice(1).toLowerCase() : null;
 
         // Check if user profile already exists
         const existingUser = await User.findOne({ uid: decodedToken.uid });
@@ -38,13 +41,13 @@ router.post('/register-profile', async (req, res) => {
         // Create new user profile (without email verification requirement)
         const newUser = new User({
             uid: decodedToken.uid,
-            username: username || decodedToken.email.split('@')[0],
+            name: formattedName || decodedToken.email.split('@')[0],
             email: decodedToken.email,
             dailyGoal: 50
         });
 
         await newUser.save();
-        console.log('✅ Registration profile created successfully for user:', decodedToken.uid, 'with username:', newUser.username);
+        console.log('✅ Registration profile created successfully for user:', decodedToken.uid, 'with name:', newUser.name);
         console.log('📋 Full user profile:', newUser.toObject());
 
         res.status(201).json({
@@ -67,7 +70,10 @@ router.post('/profile', requireAuth, async (req, res) => {
         console.log('👤 Profile creation request for user:', req.user.uid);
         console.log('👤 Request body:', req.body);
 
-        const { username, email } = req.body;
+        const { name, email } = req.body;
+
+        // Format name: capitalize first letter, lowercase rest
+        const formattedName = name ? name.charAt(0).toUpperCase() + name.slice(1).toLowerCase() : null;
 
         // Check if user profile already exists
         const existingUser = await User.findOne({ uid: req.user.uid });
@@ -82,13 +88,13 @@ router.post('/profile', requireAuth, async (req, res) => {
         // Create new user profile
         const newUser = new User({
             uid: req.user.uid,
-            username: username || req.user.email.split('@')[0], // Default username from email
+            name: formattedName || req.user.email.split('@')[0], // Default name from email
             email: req.user.email,
             dailyGoal: 50 // Default daily goal
         });
 
         await newUser.save();
-        console.log('✅ Profile created successfully for user:', req.user.uid, 'with username:', newUser.username);
+        console.log('✅ Profile created successfully for user:', req.user.uid, 'with name:', newUser.name);
 
         res.status(201).json({
             success: true,
@@ -120,19 +126,19 @@ router.get('/profile', requireAuth, async (req, res) => {
             const existingProfile = await User.findOne({ uid: req.user.uid });
 
             if (existingProfile) {
-                console.log('✅ Found existing profile for user:', req.user.uid, 'with username:', existingProfile.username);
+                console.log('✅ Found existing profile for user:', req.user.uid, 'with name:', existingProfile.name);
                 userProfile = existingProfile;
             } else {
-                // Create new profile with default username from email
+                // Create new profile with default name from email
                 userProfile = new User({
                     uid: req.user.uid,
-                    username: req.user.email.split('@')[0], // Default username from email
+                    name: req.user.email.split('@')[0], // Default name from email
                     email: req.user.email,
                     dailyGoal: 50 // Default daily goal
                 });
 
                 await userProfile.save();
-                console.log('✅ Auto-created profile for user:', req.user.uid, 'with username:', userProfile.username);
+                console.log('✅ Auto-created profile for user:', req.user.uid, 'with name:', userProfile.name);
             }
         }
 
@@ -191,23 +197,34 @@ router.put('/profile/goal', requireAuth, async (req, res) => {
     }
 });
 
-// Route to update user's username
-router.put('/profile/username', requireAuth, async (req, res) => {
+// Route to update user's name
+router.put('/profile/name', requireAuth, async (req, res) => {
     try {
-        const { username } = req.body;
+        const { name } = req.body;
 
-        // Validate the username
-        if (!username || username.trim().length < 3) {
+        // Validate the name
+        if (!name || name.trim().length < 2) {
             return res.status(400).json({
-                message: 'Username must be at least 3 characters long',
+                message: 'Name must be at least 2 characters long',
                 success: false
             });
         }
 
-        // Update the user's username
+        // Check for spaces in name
+        if (/\s/.test(name.trim())) {
+            return res.status(400).json({
+                message: 'Name cannot contain spaces',
+                success: false
+            });
+        }
+
+        // Format name: capitalize first letter, lowercase rest
+        const formattedName = name.trim().charAt(0).toUpperCase() + name.trim().slice(1).toLowerCase();
+
+        // Update the user's name
         const updatedUser = await User.findOneAndUpdate(
             { uid: req.user.uid },
-            { username: username.trim() },
+            { name: formattedName },
             { new: true } // Return the updated user
         );
 
@@ -221,18 +238,12 @@ router.put('/profile/username', requireAuth, async (req, res) => {
         res.json({
             success: true,
             user: updatedUser.getPublicProfile(),
-            message: 'Username updated successfully'
+            message: 'Name updated successfully'
         });
     } catch (error) {
-        if (error.code === 11000) {
-            return res.status(400).json({
-                message: 'Username already taken',
-                success: false
-            });
-        }
-        console.error('Update username error:', error);
+        console.error('Update name error:', error);
         res.status(500).json({
-            message: 'Server error while updating username',
+            message: 'Server error while updating name',
             success: false
         });
     }
