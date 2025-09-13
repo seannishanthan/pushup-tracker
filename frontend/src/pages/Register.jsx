@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { authAPI } from '../utils/api';
+import NavBar from '../components/NavBar';
 
 function Register() {
   const navigate = useNavigate();
@@ -214,130 +215,133 @@ function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your account
-          </h2>
-        </div>
+    <div>
+      <NavBar />
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full space-y-8 p-8">
+          <div>
+            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+              Create your account
+            </h2>
+          </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {success && (
-            <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
-              <div className="font-medium">Registration successful! 🎉</div>
-              <div className="text-sm mt-1">Please check your email for verification link. Redirecting to verification page...</div>
-            </div>
-          )}
+          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+            {success && (
+              <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                <div className="font-medium">Registration successful! 🎉</div>
+                <div className="text-sm mt-1">Please check your email for verification link. Redirecting to verification page...</div>
+              </div>
+            )}
 
-          {error && (
-            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-              {error}
-            </div>
-          )}
+            {error && (
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                {error}
+              </div>
+            )}
 
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                value={formData.name}
-                onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your name"
-                minLength="2"
-                maxLength="50"
-                pattern="^[^\s]+$"
-                title="Name must be at least 2 characters and contain no spaces"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                At least 2 characters, no spaces. Will be formatted automatically.
-              </p>
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                value={formData.email}
-                onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your email"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your password"
-                minLength="6"
-                title="Password must be at least 6 characters long"
-              />
-              <div className="mt-1">
-                <p className="text-xs text-gray-500 mb-1">
-                  At least 6 characters required
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                  Name
+                </label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter your name"
+                  minLength="2"
+                  maxLength="50"
+                  pattern="^[^\s]+$"
+                  title="Name must be at least 2 characters and contain no spaces"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  At least 2 characters, no spaces. Will be formatted automatically.
                 </p>
-                {formData.password && (
-                  <div className="flex items-center space-x-1">
-                    <div className={`h-1 w-8 rounded ${passwordStrength === 'weak' ? 'bg-red-400' :
-                      passwordStrength === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
-                      }`}></div>
-                    <div className={`h-1 w-8 rounded ${passwordStrength === 'weak' ? 'bg-gray-200' :
-                      passwordStrength === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
-                      }`}></div>
-                    <div className={`h-1 w-8 rounded ${passwordStrength === 'weak' ? 'bg-gray-200' :
-                      passwordStrength === 'medium' ? 'bg-gray-200' : 'bg-green-400'
-                      }`}></div>
-                    <span className={`text-xs ml-2 ${passwordStrength === 'weak' ? 'text-red-600' :
-                      passwordStrength === 'medium' ? 'text-yellow-600' : 'text-green-600'
-                      }`}>
-                      {passwordStrength === 'weak' ? 'Weak' :
-                        passwordStrength === 'medium' ? 'Medium' : 'Strong'}
-                    </span>
-                  </div>
-                )}
+              </div>
+
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter your email"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter your password"
+                  minLength="6"
+                  title="Password must be at least 6 characters long"
+                />
+                <div className="mt-1">
+                  <p className="text-xs text-gray-500 mb-1">
+                    At least 6 characters required
+                  </p>
+                  {formData.password && (
+                    <div className="flex items-center space-x-1">
+                      <div className={`h-1 w-8 rounded ${passwordStrength === 'weak' ? 'bg-red-400' :
+                        passwordStrength === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
+                        }`}></div>
+                      <div className={`h-1 w-8 rounded ${passwordStrength === 'weak' ? 'bg-gray-200' :
+                        passwordStrength === 'medium' ? 'bg-yellow-400' : 'bg-green-400'
+                        }`}></div>
+                      <div className={`h-1 w-8 rounded ${passwordStrength === 'weak' ? 'bg-gray-200' :
+                        passwordStrength === 'medium' ? 'bg-gray-200' : 'bg-green-400'
+                        }`}></div>
+                      <span className={`text-xs ml-2 ${passwordStrength === 'weak' ? 'text-red-600' :
+                        passwordStrength === 'medium' ? 'text-yellow-600' : 'text-green-600'
+                        }`}>
+                        {passwordStrength === 'weak' ? 'Weak' :
+                          passwordStrength === 'medium' ? 'Medium' : 'Strong'}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading || success}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {loading ? 'Creating account...' : success ? 'Account created! ✅' : 'Create account'}
-            </button>
-          </div>
+            <div>
+              <button
+                type="submit"
+                disabled={loading || success}
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              >
+                {loading ? 'Creating account...' : success ? 'Account created! ✅' : 'Create account'}
+              </button>
+            </div>
 
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Already have an account?{' '}
-              <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
-                Login
-              </Link>
-            </p>
-          </div>
-        </form>
+            <div className="text-center">
+              <p className="text-sm text-gray-600">
+                Already have an account?{' '}
+                <Link to="/login" className="font-medium text-blue-600 hover:text-blue-500">
+                  Login
+                </Link>
+              </p>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

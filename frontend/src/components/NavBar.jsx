@@ -15,11 +15,6 @@ function NavBar() {
         }
     };
 
-    // Don't show navbar if user is not authenticated
-    if (!isAuthenticated) {
-        return null;
-    }
-
     return (
         <nav className="bg-blue-600 shadow-lg">
             <div className="max-w-7xl mx-auto px-4">
@@ -32,20 +27,22 @@ function NavBar() {
                         </Link>
                     </div>
 
-                    {/* Navigation Links */}
-                    <div className="flex items-center space-x-4">
-                        <Link to="/session" className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors border border-blue-500 hover:border-blue-600">
-                            Start Session
-                        </Link>
+                    {/* Navigation Links - Only show for authenticated users */}
+                    {isAuthenticated && (
+                        <div className="flex items-center space-x-4">
+                            <Link to="/session" className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors border border-blue-500 hover:border-blue-600">
+                                Start Session
+                            </Link>
 
-                        <button
-                            onClick={handleLogout}
-                            disabled={loading}
-                            className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors border border-blue-500 hover:border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {loading ? 'Logging out...' : 'Logout'}
-                        </button>
-                    </div>
+                            <button
+                                onClick={handleLogout}
+                                disabled={loading}
+                                className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors border border-blue-500 hover:border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? 'Logging out...' : 'Logout'}
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </nav>
