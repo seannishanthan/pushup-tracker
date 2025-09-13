@@ -8,9 +8,13 @@ const router = express.Router();
 router.post('/register-profile', async (req, res) => {
     try {
         console.log('🔄 Registration profile creation request');
+        console.log('📱 User agent:', req.headers['user-agent']);
+        console.log('🌐 Origin:', req.headers.origin);
+        console.log('📋 Request headers:', JSON.stringify(req.headers, null, 2));
 
         const authHeader = req.headers.authorization;
         if (!authHeader?.startsWith('Bearer ')) {
+            console.log('❌ No authorization header found');
             return res.status(401).json({
                 success: false,
                 message: 'No token provided'
@@ -18,10 +22,13 @@ router.post('/register-profile', async (req, res) => {
         }
 
         const idToken = authHeader.split('Bearer ')[1];
+        console.log('🔑 Token length:', idToken.length);
+
         const decodedToken = await admin.auth().verifyIdToken(idToken);
 
         console.log('👤 Creating profile for user:', decodedToken.uid, 'Email:', decodedToken.email);
         console.log('👤 Request body:', req.body);
+        console.log('👤 Token decoded successfully, email verified:', decodedToken.email_verified);
 
         const { name } = req.body;
 
@@ -29,6 +36,7 @@ router.post('/register-profile', async (req, res) => {
         const formattedName = name ? name.charAt(0).toUpperCase() + name.slice(1).toLowerCase() : null;
 
         // Check if user profile already exists
+        console.log('🔍 Checking for existing user profile...');
         const existingUser = await User.findOne({ uid: decodedToken.uid });
         if (existingUser) {
             console.log('❌ Profile already exists for user:', decodedToken.uid);
@@ -39,6 +47,7 @@ router.post('/register-profile', async (req, res) => {
         }
 
         // Create new user profile (without email verification requirement)
+        console.log('🔄 Creating new user profile...');
         const newUser = new User({
             uid: decodedToken.uid,
             name: formattedName || decodedToken.email.split('@')[0],
@@ -46,9 +55,11 @@ router.post('/register-profile', async (req, res) => {
             dailyGoal: 50
         });
 
+        console.log('💾 Saving user to database...');
         await newUser.save();
         console.log('✅ Registration profile created successfully for user:', decodedToken.uid, 'with name:', newUser.name);
         console.log('📋 Full user profile:', newUser.toObject());
+        console.log('📋 User ID:', newUser._id);
 
         res.status(201).json({
             success: true,
@@ -56,11 +67,30 @@ router.post('/register-profile', async (req, res) => {
             message: 'User profile created successfully during registration'
         });
     } catch (error) {
-        console.error('Registration profile creation error:', error);
-        res.status(500).json({
-            message: 'Server error while creating user profile during registration',
-            success: false
-        });
+        console.error('❌ Registration profile creation error:', error);
+        console.error('❌ Error name:', error.name);
+        console.error('❌ Error message:', error.message);
+        console.error('❌ Error stack:', error.stack);
+
+        // Check if it's a MongoDB connection error
+        if (error.name === 'MongoNetworkError' || error.name === 'MongoTimeoutError') {
+            console.error('❌ MongoDB connection error detected');
+            res.status(503).json({
+                message: 'Database connection error. Please try again.',
+                success: false
+            });
+        } else if (error.name === 'ValidationError') {
+            console.error('❌ Validation error detected');
+            res.status(400).json({
+                message: 'Invalid user data provided',
+                success: false
+            });
+        } else {
+            res.status(500).json({
+                message: 'Server error while creating user profile during registration',
+                success: false
+            });
+        }
     }
 });
 

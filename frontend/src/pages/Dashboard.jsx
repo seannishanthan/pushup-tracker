@@ -327,7 +327,25 @@ function Dashboard() {
         console.log('✅ User name loaded:', name);
         setUserName(name);
       } else {
-        console.log('⚠️ No name found in profile, using default');
+        console.log('⚠️ No name found in profile, attempting to create profile...');
+
+        // Try to create the profile if it doesn't exist
+        try {
+          console.log('🔄 Attempting to create missing user profile...');
+          const createResponse = await authAPI.createProfile({
+            name: auth.currentUser.email.split('@')[0], // Use email prefix as default name
+            email: auth.currentUser.email
+          });
+
+          if (createResponse?.data?.user?.name) {
+            console.log('✅ Profile created successfully:', createResponse.data.user.name);
+            setUserName(createResponse.data.user.name);
+            return true;
+          }
+        } catch (createError) {
+          console.error('❌ Failed to create missing profile:', createError);
+        }
+
         setUserName('User');
         return false; // Return false to indicate failure
       }

@@ -61,16 +61,34 @@ function Register() {
 
       console.log('📧 Verification email sent');
 
-      // Create user profile in MongoDB (don't fail registration if this fails)
-      try {
-        await authAPI.createRegistrationProfile({
-          name: formData.name,
-          email: formData.email
-        });
-        console.log('✅ User profile created in database during registration');
-      } catch (profileError) {
-        console.warn('⚠️ Failed to create user profile during registration:', profileError);
-        // Don't fail the registration - profile will be created on first login
+      // Create user profile in MongoDB with retry logic for mobile
+      let profileCreated = false;
+      const maxRetries = 3;
+
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          console.log(`🔄 Creating user profile in MongoDB... (attempt ${attempt + 1}/${maxRetries})`);
+          await authAPI.createRegistrationProfile({
+            name: formData.name,
+            email: formData.email
+          });
+          console.log('✅ User profile created in database during registration');
+          profileCreated = true;
+          break; // Success, exit retry loop
+        } catch (profileError) {
+          console.error(`❌ Profile creation attempt ${attempt + 1} failed:`, profileError);
+
+          if (attempt < maxRetries - 1) {
+            console.log(`⏳ Waiting before retry ${attempt + 2}...`);
+            // Add delay between retries, longer for mobile
+            const delay = /iPhone|iPad|iPod/.test(navigator.userAgent) ? 2000 : 1000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+          } else {
+            console.error('❌ All profile creation attempts failed');
+            // Show warning to user but don't fail registration
+            setError('Registration successful, but profile setup failed. Please try logging in after email verification.');
+          }
+        }
       }
 
       // Store email for navigation before clearing form
@@ -88,8 +106,12 @@ function Register() {
       });
 
       // Navigate to verification page after a brief delay
+      const successMessage = profileCreated
+        ? 'Registration successful! Please check your email for verification link.'
+        : 'Registration successful! Please check your email for verification link. Note: Profile setup may need to be completed after verification.';
+
       setTimeout(() => {
-        navigate(`/verify?email=${encodeURIComponent(userEmail)}&message=Registration successful! Please check your email for verification link.`, { replace: true });
+        navigate(`/verify?email=${encodeURIComponent(userEmail)}&message=${encodeURIComponent(successMessage)}`, { replace: true });
       }, 2000);
 
     } catch (error) {
