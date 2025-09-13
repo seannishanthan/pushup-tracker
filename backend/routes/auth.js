@@ -45,6 +45,7 @@ router.post('/register-profile', async (req, res) => {
 
         await newUser.save();
         console.log('✅ Registration profile created successfully for user:', decodedToken.uid, 'with username:', newUser.username);
+        console.log('📋 Full user profile:', newUser.toObject());
 
         res.status(201).json({
             success: true,
@@ -115,15 +116,24 @@ router.get('/profile', requireAuth, async (req, res) => {
         if (!userProfile) {
             console.log('🔄 Auto-creating profile for verified user:', req.user.uid);
 
-            userProfile = new User({
-                uid: req.user.uid,
-                username: req.user.email.split('@')[0], // Default username from email
-                email: req.user.email,
-                dailyGoal: 50 // Default daily goal
-            });
+            // Try to find if there's an existing profile that might not have been loaded
+            const existingProfile = await User.findOne({ uid: req.user.uid });
 
-            await userProfile.save();
-            console.log('✅ Auto-created profile for user:', req.user.uid, 'with username:', userProfile.username);
+            if (existingProfile) {
+                console.log('✅ Found existing profile for user:', req.user.uid, 'with username:', existingProfile.username);
+                userProfile = existingProfile;
+            } else {
+                // Create new profile with default username from email
+                userProfile = new User({
+                    uid: req.user.uid,
+                    username: req.user.email.split('@')[0], // Default username from email
+                    email: req.user.email,
+                    dailyGoal: 50 // Default daily goal
+                });
+
+                await userProfile.save();
+                console.log('✅ Auto-created profile for user:', req.user.uid, 'with username:', userProfile.username);
+            }
         }
 
         res.json({
@@ -235,6 +245,33 @@ router.get('/check', requireAuth, (req, res) => {
         message: 'Authentication valid',
         uid: req.user.uid
     });
+});
+
+// Debug endpoint to check user profile data
+router.get('/debug-profile', requireAuth, async (req, res) => {
+    try {
+        console.log('🔍 Debug profile request for user:', req.user.uid);
+
+        // Check if profile exists in req.user
+        console.log('🔍 Profile from middleware:', req.user.profile);
+
+        // Try to find profile directly
+        const directProfile = await User.findOne({ uid: req.user.uid });
+        console.log('🔍 Direct profile lookup:', directProfile);
+
+        res.json({
+            success: true,
+            middlewareProfile: req.user.profile,
+            directProfile: directProfile,
+            userClaims: req.user.claims
+        });
+    } catch (error) {
+        console.error('Debug profile error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
 });
 
 module.exports = router;

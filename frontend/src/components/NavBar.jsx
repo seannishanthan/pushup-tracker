@@ -1,14 +1,15 @@
 import { Link } from 'react-router-dom';
 import { useFirebaseAuth } from '../hooks/useFirebaseAuth';
-import { signOut } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { clearTokenCache } from '../utils/api';
 
 function NavBar() {
-    const { user, isAuthenticated } = useFirebaseAuth();
+    const { user, isAuthenticated, logout, loading } = useFirebaseAuth();
 
     const handleLogout = async () => {
         try {
-            await signOut(auth);
+            // Clear token cache before logout
+            clearTokenCache();
+            await logout();
         } catch (error) {
             console.error('Error signing out:', error);
         }
@@ -37,8 +38,12 @@ function NavBar() {
                             Start Session
                         </Link>
 
-                        <button onClick={handleLogout} className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors border border-blue-500 hover:border-blue-600">
-                            Logout
+                        <button
+                            onClick={handleLogout}
+                            disabled={loading}
+                            className="bg-blue-700 hover:bg-blue-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors border border-blue-500 hover:border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {loading ? 'Logging out...' : 'Logout'}
                         </button>
                     </div>
                 </div>

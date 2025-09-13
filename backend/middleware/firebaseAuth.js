@@ -18,10 +18,13 @@ async function requireAuth(req, res, next) {
         // Decode the Firebase ID token
         const decodedToken = await admin.auth().verifyIdToken(idToken);
         console.log(`🔍 Token verification for user: ${decodedToken.email}, UID: ${decodedToken.uid}, Email verified: ${decodedToken.email_verified}`);
+        console.log(`🔍 Token issued at: ${new Date(decodedToken.iat * 1000).toISOString()}`);
+        console.log(`🔍 Token expires at: ${new Date(decodedToken.exp * 1000).toISOString()}`);
 
         // Enforce email verification server-side
         if (!decodedToken.email_verified) {
             console.log(`❌ Email not verified for user: ${decodedToken.email}`);
+            console.log(`❌ Token was issued at: ${new Date(decodedToken.iat * 1000).toISOString()}`);
             return res.status(403).json({
                 success: false,
                 message: 'Please verify your email'

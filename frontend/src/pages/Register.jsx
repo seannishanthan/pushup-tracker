@@ -4,7 +4,6 @@ import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/
 import { auth } from '../lib/firebase';
 import { authAPI } from '../utils/api';
 
-
 function Register() {
   const navigate = useNavigate();
 
@@ -26,7 +25,7 @@ function Register() {
         throw new Error('Firebase not initialized. Please check your configuration.');
       }
 
-      console.log('Attempting registration with:', formData.email);
+      console.log('🔐 Attempting registration with:', formData.email);
 
       // Create user with Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
@@ -35,7 +34,7 @@ function Register() {
         formData.password
       );
 
-      console.log('User created successfully:', userCredential.user.uid);
+      console.log('✅ User created successfully:', userCredential.user.uid);
 
       // Send email verification
       const continueUrl = import.meta.env.VITE_FB_CONTINUE_URL || `${window.location.origin}/`;
@@ -44,48 +43,53 @@ function Register() {
         url: continueUrl
       });
 
-      console.log('Verification email sent');
+      console.log('📧 Verification email sent');
 
-      // Create user profile in MongoDB
+      // Create user profile in MongoDB (don't fail registration if this fails)
       try {
         await authAPI.createRegistrationProfile({
           username: formData.username,
           email: formData.email
         });
-        console.log('User profile created in database during registration');
+        console.log('✅ User profile created in database during registration');
       } catch (profileError) {
-        console.error('Failed to create user profile during registration:', profileError);
-        // Don't fail the registration if profile creation fails
-        // User can still log in and profile will be created on first login
+        console.warn('⚠️ Failed to create user profile during registration:', profileError);
+        // Don't fail the registration - profile will be created on first login
       }
 
-      // Navigate to verification page
-      navigate(`/verify?email=${encodeURIComponent(formData.email)}`);
+      // Navigate to verification page with success message
+      navigate(`/verify?email=${encodeURIComponent(formData.email)}&message=Registration successful! Please check your email for verification link.`);
 
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('❌ Registration error:', error);
 
       // Handle Firebase-specific errors
-      let errorMessage = 'Registration failed';
+      let errorMessage = 'Registration failed. Please try again.';
 
       switch (error.code) {
         case 'auth/email-already-in-use':
-          errorMessage = 'Email is already registered';
+          errorMessage = 'This email is already registered. Try logging in instead.';
           break;
         case 'auth/weak-password':
-          errorMessage = 'Password is too weak';
+          errorMessage = 'Password is too weak. Please choose a stronger password.';
           break;
         case 'auth/invalid-email':
-          errorMessage = 'Invalid email address';
+          errorMessage = 'Please enter a valid email address.';
+          break;
+        case 'auth/operation-not-allowed':
+          errorMessage = 'Email registration is not enabled. Please contact support.';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your connection and try again.';
           break;
         default:
-          errorMessage = error.message;
+          errorMessage = error.message || 'An unexpected error occurred';
       }
 
       setError(errorMessage);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const handleChange = (e) => {

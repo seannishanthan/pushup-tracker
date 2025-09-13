@@ -1,8 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useSearchParams, useNavigate } from 'react-router-dom'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { applyActionCode } from 'firebase/auth'
 import { auth } from './lib/firebase'
 import { useFirebaseAuth } from './hooks/useFirebaseAuth'
+import { clearTokenCache } from './utils/api'
 import Login from './pages/Login.jsx'
 import Register from './pages/Register.jsx'
 import VerifyEmail from './pages/VerifyEmail.jsx'
@@ -20,24 +21,21 @@ function EmailVerificationHandler() {
       const mode = searchParams.get('mode');
       const oobCode = searchParams.get('oobCode');
 
-      // Prevent duplicate processing using ref
-      if (processedRef.current) {
-        console.log('🔄 Verification already processed, skipping...');
+      // Prevent duplicate processing
+      if (processedRef.current || !mode || !oobCode) {
         return;
       }
 
-      if (mode === 'verifyEmail' && oobCode) {
+      if (mode === 'verifyEmail') {
         processedRef.current = true;
         console.log('📧 Processing email verification from URL parameters');
-        console.log('Current user:', auth?.currentUser?.email);
-        console.log('User authenticated:', !!auth?.currentUser);
 
         try {
-          // Apply the email verification code first
-          const result = await applyActionCode(auth, oobCode);
+          // Apply the email verification code
+          await applyActionCode(auth, oobCode);
           console.log('✅ Email verification applied successfully');
 
-          // Clear the verification parameters from URL after successful verification
+          // Clear URL parameters
           const newParams = new URLSearchParams(searchParams);
           newParams.delete('mode');
           newParams.delete('oobCode');
@@ -45,41 +43,32 @@ function EmailVerificationHandler() {
           newParams.delete('lang');
           setSearchParams(newParams, { replace: true });
 
-          // Check if user is currently signed in
+          // Clear token cache to ensure fresh tokens
+          clearTokenCache();
+
+          // Check if user is signed in
           if (auth?.currentUser) {
-            console.log('User already signed in, refreshing auth state...');
-            // Force refresh the current user AND get a new token
+            console.log('🔄 User signed in, refreshing auth state...');
             await auth.currentUser.reload();
-            console.log('🔄 User auth state refreshed');
-            console.log('📧 Email verified:', auth.currentUser.emailVerified);
 
-            // Force get a new ID token (this is crucial!)
-            const newToken = await auth.currentUser.getIdToken(true);
-            console.log('🔑 New ID token generated after verification');
+            // Force get a fresh ID token with the updated verification status
+            console.log('🔑 Getting fresh ID token after verification...');
+            await auth.currentUser.getIdToken(true); // Force refresh
+
+            // Clear token cache to ensure fresh tokens are used
+            clearTokenCache();
+
+            // Redirect to dashboard
+            navigate('/', { replace: true });
           } else {
-            console.log('⚠️ No user signed in during verification - this happens with cross-session verification');
-            console.log('User will need to sign in again to see their verified status');
-
-            // Redirect to login page with a success message
+            console.log('⚠️ No user signed in, redirecting to login');
             navigate('/login?message=Email verified! Please sign in to continue.', { replace: true });
-            return;
           }
-
-          // Longer delay to ensure token propagation and profile creation
-          await new Promise(resolve => setTimeout(resolve, 1500));
-
-          // Explicitly redirect to dashboard after successful verification
-          console.log('🎉 Email verification successful, redirecting to dashboard...');
-          navigate('/', { replace: true });
-
-          // Note: No longer relying on RequireAuth component for redirect
 
         } catch (error) {
           console.error('❌ Error applying verification code:', error);
-          console.error('Error code:', error.code);
-          console.error('Error message:', error.message);
 
-          // Clear URL parameters even on error to prevent loops
+          // Clear URL parameters
           const newParams = new URLSearchParams(searchParams);
           newParams.delete('mode');
           newParams.delete('oobCode');
@@ -87,16 +76,14 @@ function EmailVerificationHandler() {
           newParams.delete('lang');
           setSearchParams(newParams, { replace: true });
 
-          let errorMessage = 'Failed to verify email. ';
+          // Handle specific errors
+          let errorMessage = 'Failed to verify email. Please try again.';
           if (error.code === 'auth/invalid-action-code') {
-            errorMessage = 'This verification link is invalid or has already been used. Please request a new verification email.';
+            errorMessage = 'This verification link is invalid or has already been used.';
           } else if (error.code === 'auth/expired-action-code') {
-            errorMessage = 'This verification link has expired. Please request a new verification email.';
-          } else {
-            errorMessage = 'Unable to verify email with this link. Please request a new verification email.';
+            errorMessage = 'This verification link has expired.';
           }
 
-          // Redirect to verify page with error handling
           navigate(`/verify?error=${encodeURIComponent(errorMessage)}`);
         }
       }
@@ -105,32 +92,36 @@ function EmailVerificationHandler() {
     handleEmailVerification();
   }, [searchParams, setSearchParams, navigate]);
 
-  return null; // This component doesn't render anything
+  return null;
 }
 
 // Component to protect routes that require authentication
 function RequireAuth({ children }) {
-  const { initializing, user, isVerified } = useFirebaseAuth();
-  const [verificationCheckDelay, setVerificationCheckDelay] = useState(false);
+  const { initializing, user, isVerified, error } = useFirebaseAuth();
 
-  // Add a brief delay after user loads to allow verification state to update
-  useEffect(() => {
-    if (user && !isVerified && !verificationCheckDelay) {
-      setVerificationCheckDelay(true);
-      const timer = setTimeout(() => {
-        setVerificationCheckDelay(false);
-      }, 2000); // 2 second delay to allow auth state to update
-
-      return () => clearTimeout(timer);
-    }
-  }, [user, isVerified, verificationCheckDelay]);
-
-  if (initializing || verificationCheckDelay) {
+  if (initializing) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 text-lg font-medium mb-4">Authentication Error</div>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );

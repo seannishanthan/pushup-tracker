@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import NavBar from "../components/NavBar";
 import { authAPI, pushupAPI } from '../utils/api';
+import { clearTokenCache } from '../utils/api';
 import { auth } from '../lib/firebase';
 import { useFirebaseAuth } from '../hooks/useFirebaseAuth';
 
@@ -272,17 +273,34 @@ function Dashboard() {
   };
 
   // Fetch the user name and daily goal from API
-  const fetchUserName = async () => {
+  const fetchUserName = async (retryCount = 0) => {
     try {
-      console.log('📋 Fetching user profile...');
+      console.log('📋 Fetching user profile... (attempt', retryCount + 1, ')');
       const userResponse = await authAPI.getProfile();
+
+      console.log('📋 Full API response:', userResponse);
+      console.log('📋 Response data:', userResponse?.data);
+      console.log('📋 User data:', userResponse?.data?.user);
+
+      // Debug: Also try the debug endpoint
+      try {
+        const debugResponse = await authAPI.debugProfile();
+        console.log('🔍 Debug profile response:', debugResponse);
+      } catch (debugError) {
+        console.log('🔍 Debug profile failed:', debugError);
+      }
 
       // The correct response structure is: Axios wraps it as { data: { success: true, user: { username, email, ... } } }
       let name = null;
       if (userResponse?.data?.user?.username) {
         name = userResponse.data.user.username;
+        console.log('✅ Found username in response:', name);
       } else if (userResponse?.data?.user?.name) {
         name = userResponse.data.user.name;
+        console.log('✅ Found name in response:', name);
+      } else {
+        console.log('⚠️ No username or name found in response');
+        console.log('📋 Available user fields:', Object.keys(userResponse?.data?.user || {}));
       }
 
       if (name) {
@@ -307,6 +325,24 @@ function Dashboard() {
       console.error('Response status:', err.response?.status);
       console.error('Response data:', err.response?.data);
 
+      // If it's a 403 error and we haven't retried too many times, try again
+      if (err.response?.status === 403 && retryCount < 2) {
+        console.log('🔄 403 error - token may not have propagated yet, retrying...');
+
+        // Force refresh token and clear cache
+        if (auth?.currentUser) {
+          try {
+            await auth.currentUser.getIdToken(true);
+            clearTokenCache();
+            console.log('🔑 Refreshed token, retrying in 2 seconds...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            return fetchUserName(retryCount + 1);
+          } catch (tokenError) {
+            console.error('❌ Error refreshing token:', tokenError);
+          }
+        }
+      }
+
       // Backend should now auto-create profiles, so this should rarely happen
       // Keep defaults if API call fails
       setUserName('User');
@@ -323,6 +359,14 @@ function Dashboard() {
           await auth.currentUser.reload();
           console.log('🔄 Dashboard: Refreshed Firebase auth state');
           console.log('📧 Email verified:', auth.currentUser.emailVerified);
+
+          // Force get a fresh ID token to ensure backend gets updated verification status
+          if (auth.currentUser.emailVerified) {
+            console.log('🔑 Getting fresh ID token for verified user...');
+            await auth.currentUser.getIdToken(true);
+            // Clear token cache to ensure fresh tokens are used
+            clearTokenCache();
+          }
         } catch (error) {
           console.error('Error refreshing auth state:', error);
         }
@@ -338,8 +382,14 @@ function Dashboard() {
       };
       setCurrentDate(today.toLocaleDateString('en-US', options));
 
+      // Add a small delay to ensure token propagation after verification
+      if (auth?.currentUser?.emailVerified) {
+        console.log('⏳ Waiting for token propagation after verification...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
       // Fetch the user name and daily goal from API
-      await fetchUserName();
+      await fetchUserName(0);
 
       // Fetch today's reps and other data (this function handles all calculations)
       await fetchTodayReps();
@@ -683,11 +733,11 @@ function Dashboard() {
     // If user just got verified, refresh their profile data
     if (isVerified && userName === 'User') {
       console.log('🔄 User verification status changed, refreshing profile data...');
-      
+
       // Add a small delay to ensure backend has processed the verification
       const refreshTimer = setTimeout(async () => {
         try {
-          await fetchUserName();
+          await fetchUserName(0);
           console.log('✅ Profile data refreshed after verification');
         } catch (error) {
           console.error('Error refreshing profile after verification:', error);

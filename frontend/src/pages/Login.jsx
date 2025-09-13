@@ -3,28 +3,24 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { useFirebaseAuth } from '../hooks/useFirebaseAuth';
+import { clearTokenCache } from '../utils/api';
 
 function Login() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const emailFromParams = searchParams.get('email') || '';
     const verificationMessage = searchParams.get('message') || '';
-    const { user, isVerified } = useFirebaseAuth();
+    const { user, isVerified, error: authError } = useFirebaseAuth();
 
-    // when state variables are changed, the component will re-render on UI with the new values
-
-    // stateful variables to update form data on UI as user types
+    // Form state
     const [formData, setFormData] = useState({
         email: emailFromParams,
         password: ''
     });
 
-    // state to show signing in... and disable button while login request is in progress
+    // UI state
     const [loading, setLoading] = useState(false);
-
-    // state to show error messages if login fails
     const [error, setError] = useState('');
-    const [showVerificationBanner, setShowVerificationBanner] = useState(false);
     const [successMessage, setSuccessMessage] = useState(verificationMessage);
 
     // Redirect if already authenticated and verified
@@ -34,46 +30,47 @@ function Login() {
         }
     }, [user, isVerified, navigate]);
 
+    // Clear any auth errors when component mounts
+    useEffect(() => {
+        if (authError) {
+            setError(authError);
+        }
+    }, [authError]);
+
     const handleSubmit = async (e) => {
-        e.preventDefault(); // prevent refresh on submit
-        setLoading(true); // update states
+        e.preventDefault();
+        setLoading(true);
         setError('');
-        setShowVerificationBanner(false);
+        setSuccessMessage('');
 
         try {
             if (!auth) {
                 throw new Error('Firebase not initialized. Please check your configuration.');
             }
 
+            console.log('🔐 Attempting login for:', formData.email);
             const userCredential = await signInWithEmailAndPassword(auth, formData.email, formData.password);
 
-            // Reload user multiple times to ensure we get the latest verification status
-            await userCredential.user.reload();
+            console.log('✅ Login successful for:', userCredential.user.email);
+            console.log('📧 Email verified:', userCredential.user.emailVerified);
 
-            // If still not verified, wait a moment and try again
+            // Clear token cache to ensure fresh tokens
+            clearTokenCache();
+
+            // If email is not verified, show appropriate message
             if (!userCredential.user.emailVerified) {
-                console.log('First check: email not verified, retrying...');
-
-                // Wait 2 seconds and reload again
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                await userCredential.user.reload();
-
-                // Final check
-                if (!userCredential.user.emailVerified) {
-                    setShowVerificationBanner(true);
-                    setError('Please verify your email before logging in. If you just clicked the verification link, please wait a moment and try again.');
-                    return;
-                }
+                setError('Please verify your email address before logging in. Check your inbox for a verification link.');
+                return;
             }
 
-            console.log('Login successful!', userCredential.user.uid);
             // Navigation will be handled by the useEffect above
+            console.log('🎉 Login complete, redirecting to dashboard...');
 
         } catch (error) {
-            console.error('Login error:', error);
+            console.error('❌ Login error:', error);
 
             // Handle Firebase-specific errors
-            let errorMessage = 'Login failed';
+            let errorMessage = 'Login failed. Please try again.';
 
             switch (error.code) {
                 case 'auth/user-not-found':
@@ -87,14 +84,17 @@ function Login() {
                 case 'auth/too-many-requests':
                     errorMessage = 'Too many failed attempts. Please try again later.';
                     break;
+                case 'auth/network-request-failed':
+                    errorMessage = 'Network error. Please check your connection and try again.';
+                    break;
                 default:
-                    errorMessage = error.message;
+                    errorMessage = error.message || 'An unexpected error occurred';
             }
 
             setError(errorMessage);
+        } finally {
+            setLoading(false);
         }
-
-        setLoading(false);
     };
 
     const handleChange = (e) => {
@@ -114,29 +114,6 @@ function Login() {
                 </div>
 
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-
-                    {/* Verification banner */}
-                    {showVerificationBanner && (
-                        <div className="bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded">
-                            <p className="text-sm mb-2">
-                                Please verify your email address before logging in.{' '}
-                                <Link
-                                    to={`/verify?email=${encodeURIComponent(formData.email)}`}
-                                    className="font-medium underline hover:text-yellow-900"
-                                >
-                                    Click here to verify
-                                </Link>
-                            </p>
-                            <button
-                                type="button"
-                                onClick={handleSubmit}
-                                className="text-xs bg-yellow-200 hover:bg-yellow-300 px-2 py-1 rounded"
-                            >
-                                ↻ I just verified, try again
-                            </button>
-                        </div>
-                    )}
-
                     {/* Success message for email verification */}
                     {successMessage && (
                         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
@@ -144,10 +121,20 @@ function Login() {
                         </div>
                     )}
 
-                    {/* If error is not empty string (falsy) display it in red */}
+                    {/* Error message */}
                     {error && (
                         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                            {error}
+                            <div className="font-medium">{error}</div>
+                            {error.includes('verify your email') && (
+                                <div className="text-sm mt-2">
+                                    <Link
+                                        to={`/verify?email=${encodeURIComponent(formData.email)}`}
+                                        className="font-medium underline hover:text-red-800"
+                                    >
+                                        Go to verification page
+                                    </Link>
+                                </div>
+                            )}
                         </div>
                     )}
 

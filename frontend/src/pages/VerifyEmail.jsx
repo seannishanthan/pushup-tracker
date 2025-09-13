@@ -8,38 +8,25 @@ function VerifyEmail() {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const emailFromParams = searchParams.get('email') || '';
+    const messageFromParams = searchParams.get('message') || '';
     const { user, isVerified } = useFirebaseAuth();
 
     const [resendLoading, setResendLoading] = useState(false);
-    const [message, setMessage] = useState('');
+    const [message, setMessage] = useState(messageFromParams);
     const [error, setError] = useState('');
     const [resendCountdown, setResendCountdown] = useState(0);
 
-    // Check for error parameter from App.jsx verification handling
+    // Check for error parameter from URL
     useEffect(() => {
         const errorParam = searchParams.get('error');
-        const mode = searchParams.get('mode');
-        const oobCode = searchParams.get('oobCode');
-
-        // If we have verification parameters, show loading message and don't show errors
-        if (mode === 'verifyEmail' && oobCode) {
-            console.log('🔄 Verification parameters detected on /verify page - processing...');
-            setError(''); // Clear any previous errors
-            setMessage('Processing email verification...');
-            return;
-        }
-
-        // Only set error if user is not already verified and no verification is in progress
-        if (errorParam && !(user && isVerified)) {
+        if (errorParam) {
             setError(errorParam);
-            // If it's a verification link error, clear the error parameter from URL
-            if (errorParam.includes('verification link') || errorParam.includes('verify email')) {
-                const newParams = new URLSearchParams(searchParams);
-                newParams.delete('error');
-                window.history.replaceState({}, '', `${window.location.pathname}?${newParams.toString()}`);
-            }
+            // Clear error from URL
+            const newParams = new URLSearchParams(searchParams);
+            newParams.delete('error');
+            window.history.replaceState({}, '', `${window.location.pathname}?${newParams.toString()}`);
         }
-    }, [searchParams, user, isVerified]);
+    }, [searchParams]);
 
     // Countdown timer for resend button
     useEffect(() => {
@@ -55,7 +42,7 @@ function VerifyEmail() {
     // Check if user is already verified
     useEffect(() => {
         if (user && isVerified) {
-            setError(''); // Clear any error state
+            setError('');
             setMessage('Email already verified! Redirecting to dashboard...');
             setTimeout(() => {
                 navigate('/');
@@ -78,21 +65,25 @@ function VerifyEmail() {
             });
 
             setMessage('New verification email sent! Please check your inbox.');
-            setResendCountdown(120); // 2 minute cooldown to avoid rate limits
+            setResendCountdown(60); // 1 minute cooldown to avoid rate limits
         } catch (error) {
-            console.error('Resend error:', error);
+            console.error('❌ Resend error:', error);
 
             // Handle specific Firebase errors
-            if (error.code === 'auth/too-many-requests') {
-                setError('Too many requests. Please wait a few minutes before trying again.');
-            } else if (error.code === 'auth/user-disabled') {
-                setError('Your account has been disabled. Please contact support.');
-            } else {
-                setError(error.message || 'Failed to resend verification email');
-            }
-        }
+            let errorMessage = 'Failed to resend verification email. Please try again.';
 
-        setResendLoading(false);
+            if (error.code === 'auth/too-many-requests') {
+                errorMessage = 'Too many requests. Please wait a few minutes before trying again.';
+            } else if (error.code === 'auth/user-disabled') {
+                errorMessage = 'Your account has been disabled. Please contact support.';
+            } else if (error.code === 'auth/network-request-failed') {
+                errorMessage = 'Network error. Please check your connection and try again.';
+            }
+
+            setError(errorMessage);
+        } finally {
+            setResendLoading(false);
+        }
     };
 
     const handleCheckVerification = async () => {
@@ -112,7 +103,7 @@ function VerifyEmail() {
                 setError('Email not yet verified. Please check your email and click the verification link.');
             }
         } catch (error) {
-            console.error('Check verification error:', error);
+            console.error('❌ Check verification error:', error);
             setError('Unable to check verification status. Please try again.');
         }
     };
