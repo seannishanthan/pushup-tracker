@@ -370,21 +370,14 @@ function Dashboard() {
     // Force refresh Firebase auth state if user just verified email
     const initializeDashboard = async () => {
       console.log('🚀 Initializing dashboard...');
-      console.log('📱 User agent:', navigator.userAgent);
-      console.log('🔍 Is mobile Safari:', /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent));
 
       // Check if we're coming from email verification (force refresh auth state)
       if (auth?.currentUser) {
         try {
-          console.log('🔄 Reloading Firebase user...');
           await auth.currentUser.reload();
-          console.log('🔄 Dashboard: Refreshed Firebase auth state');
-          console.log('📧 Email verified:', auth.currentUser.emailVerified);
-          console.log('👤 User UID:', auth.currentUser.uid);
 
           // Force get a fresh ID token to ensure backend gets updated verification status
           if (auth.currentUser.emailVerified) {
-            console.log('🔑 Getting fresh ID token for verified user...');
             await auth.currentUser.getIdToken(true);
             // Clear token cache to ensure fresh tokens are used
             clearTokenCache();
@@ -394,7 +387,6 @@ function Dashboard() {
           console.error('❌ Error refreshing auth state:', error);
         }
       } else {
-        console.log('⚠️ No current user found in auth state');
       }
 
       // Set current date
@@ -434,7 +426,6 @@ function Dashboard() {
         // Get user profile first to get the daily goal
         const userResponse = await authAPI.getProfile();
         const userDailyGoal = userResponse?.data?.user?.dailyGoal || 20;
-        console.log('👤 User daily goal:', userDailyGoal);
 
         // Ensure daily goal is set in state
         setDailyGoal(userDailyGoal);
@@ -770,7 +761,6 @@ function Dashboard() {
 
     // If user just got verified, refresh their profile data
     if (isVerified && userName === 'User') {
-      console.log('🔄 User verification status changed, refreshing profile data...');
 
       // Set loading to true while refreshing
       setIsLoading(true);
@@ -801,7 +791,6 @@ function Dashboard() {
 
       const fallbackTimer = setTimeout(async () => {
         try {
-          console.log('🔄 Fallback retry: fetching user profile...');
           await fetchUserName(0);
         } catch (error) {
           console.error('❌ Fallback retry failed:', error);

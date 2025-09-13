@@ -185,7 +185,6 @@ function Session() {
             const kneeVisibilities = [LEFT_KNEE, RIGHT_KNEE].map(index => landmarks[index]?.visibility ?? 0);
             const ankleVisibilities = [LEFT_ANKLE, RIGHT_ANKLE].map(index => landmarks[index]?.visibility ?? 0);
             const upperBodyVisibilities = upperBodyLandmarks.map(index => landmarks[index]?.visibility ?? 0);
-            console.log(`Knee visibilities:`, kneeVisibilities, `Ankle visibilities:`, ankleVisibilities);
 
             const validKnees = [LEFT_KNEE, RIGHT_KNEE].filter(index =>
                 landmarks[index] && landmarks[index].visibility > 0.6
@@ -635,37 +634,7 @@ function Session() {
 
             <h1 className="text-2xl font-bold mb-4">Push‑Up Session</h1>
 
-            {/* Stats Display */}
-            <div className="grid grid-cols-3 gap-4 mb-4">
-                <div className="bg-blue-100 p-4 rounded-lg text-center">
-                    <div className="text-3xl font-bold text-blue-600">{pushupCount}</div>
-                    <div className="text-sm text-blue-800">Push-ups</div>
-                </div>
-                <div className="bg-green-100 p-4 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-green-600">{formatTime(sessionDuration)}</div>
-                    <div className="text-sm text-green-800">Duration</div>
-                </div>
-                <div className="bg-purple-100 p-4 rounded-lg text-center">
-                    <div className="text-sm font-semibold text-purple-800 mb-2">
-                        Current Phase: {pushupStateRef.current?.phase || 'waiting'}
-                        {pushupStateRef.current?.phase === 'setup' && pushupStateRef.current?.setupStartTime &&
-                            ` (${Math.max(0, Math.ceil((pushupStateRef.current.setupDuration - (Date.now() - pushupStateRef.current.setupStartTime)) / 1000))}s)`
-                        }
-                    </div>
-                    <div className="text-sm font-semibold text-purple-800">
-                        Arm Angle: {debugInfo.armAngle}°
-                    </div>
-                </div>
-            </div>
 
-            {/* Landmark Visibility Feedback */}
-            {status === 'running' && (
-                <div className="mt-4 p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                    <div className="text-sm text-yellow-800">
-                        <strong>Visibility Check:</strong> {getVisibilityFeedback()}
-                    </div>
-                </div>
-            )}
 
             {/* Webcam or Notes Input */}
             <div className="relative rounded-2xl overflow-hidden shadow min-h-[320px] flex items-center justify-center">
@@ -690,6 +659,42 @@ function Session() {
                             width={1280}
                             height={720}
                         />
+
+                        {/* Stats Overlays - Only show when running */}
+                        {status === 'running' && (
+                            <>
+                                {/* Push-up Count Overlay - Top Left */}
+                                <div className="absolute top-4 left-4 bg-blue-600 bg-opacity-10 backdrop-blur-sm text-white p-3 rounded-lg shadow-lg border border-blue-400 border-opacity-20">
+                                    <div className="text-2xl font-bold drop-shadow-lg">{pushupCount}</div>
+                                    <div className="text-xs opacity-90 drop-shadow-md">Push-ups</div>
+                                </div>
+
+                                {/* Duration Overlay - Top Right */}
+                                <div className="absolute top-4 right-4 bg-green-600 bg-opacity-10 backdrop-blur-sm text-white p-3 rounded-lg shadow-lg border border-green-400 border-opacity-20">
+                                    <div className="text-xl font-bold drop-shadow-lg">{formatTime(sessionDuration)}</div>
+                                    <div className="text-xs opacity-90 drop-shadow-md">Duration</div>
+                                </div>
+
+                                {/* Phase & Angle Overlay - Bottom Left */}
+                                <div className="absolute bottom-4 left-4 bg-purple-600 bg-opacity-10 backdrop-blur-sm text-white p-3 rounded-lg shadow-lg border border-purple-400 border-opacity-20">
+                                    <div className="text-sm font-semibold mb-1 drop-shadow-lg">
+                                        Phase: {pushupStateRef.current?.phase || 'waiting'}
+                                        {pushupStateRef.current?.phase === 'setup' && pushupStateRef.current?.setupStartTime &&
+                                            ` (${Math.max(0, Math.ceil((pushupStateRef.current.setupDuration - (Date.now() - pushupStateRef.current.setupStartTime)) / 1000))}s)`
+                                        }
+                                    </div>
+                                    <div className="text-sm font-semibold drop-shadow-lg">
+                                        Angle: {debugInfo.armAngle}°
+                                    </div>
+                                </div>
+
+                                {/* Visibility Feedback Overlay - Bottom Right */}
+                                <div className="absolute bottom-4 right-4 bg-yellow-600 bg-opacity-10 backdrop-blur-sm text-white p-3 rounded-lg shadow-lg max-w-xs border border-yellow-400 border-opacity-20">
+                                    <div className="text-xs font-semibold mb-1 drop-shadow-lg">Visibility:</div>
+                                    <div className="text-xs opacity-90 drop-shadow-md">{getVisibilityFeedback()}</div>
+                                </div>
+                            </>
+                        )}
                         {/* Setup Phase Overlay */}
                         {status === 'running' && pushupStateRef.current?.phase === 'setup' && (
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
