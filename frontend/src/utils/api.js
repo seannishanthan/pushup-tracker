@@ -115,8 +115,9 @@ export const authAPI = {
     updateName: (name) => api.put('/auth/profile/name', { name }),
     // Health check for auth
     checkAuth: () => api.get('/auth/check'),
-    // Debug endpoint
+    // Debug endpoints
     debugProfile: () => api.get('/auth/debug-profile'),
+    debugAllUsers: () => api.get('/auth/debug-all-users'),
 };
 
 // Pushup Sessions API

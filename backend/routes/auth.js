@@ -31,9 +31,36 @@ router.post('/register-profile', async (req, res) => {
         console.log('👤 Token decoded successfully, email verified:', decodedToken.email_verified);
 
         const { name } = req.body;
+        console.log('📝 Raw name from request:', name);
+
+        // Validate name before formatting
+        if (!name || typeof name !== 'string') {
+            console.log('❌ Invalid name provided:', name);
+            return res.status(400).json({
+                message: 'Name is required and must be a string',
+                success: false
+            });
+        }
+
+        if (name.trim().length < 2) {
+            console.log('❌ Name too short:', name);
+            return res.status(400).json({
+                message: 'Name must be at least 2 characters long',
+                success: false
+            });
+        }
+
+        if (/\s/.test(name.trim())) {
+            console.log('❌ Name contains spaces:', name);
+            return res.status(400).json({
+                message: 'Name cannot contain spaces',
+                success: false
+            });
+        }
 
         // Format name: capitalize first letter, lowercase rest
-        const formattedName = name ? name.charAt(0).toUpperCase() + name.slice(1).toLowerCase() : null;
+        const formattedName = name.trim().charAt(0).toUpperCase() + name.trim().slice(1).toLowerCase();
+        console.log('📝 Formatted name:', formattedName);
 
         // Check if user profile already exists
         console.log('🔍 Checking for existing user profile...');
@@ -42,6 +69,16 @@ router.post('/register-profile', async (req, res) => {
             console.log('❌ Profile already exists for user:', decodedToken.uid);
             return res.status(400).json({
                 message: 'User profile already exists',
+                success: false
+            });
+        }
+
+        // Also check if email already exists (shouldn't happen but good to log)
+        const existingEmail = await User.findOne({ email: decodedToken.email });
+        if (existingEmail) {
+            console.log('❌ Email already exists in database:', decodedToken.email);
+            return res.status(400).json({
+                message: 'Email already registered',
                 success: false
             });
         }
@@ -70,6 +107,7 @@ router.post('/register-profile', async (req, res) => {
         console.error('❌ Registration profile creation error:', error);
         console.error('❌ Error name:', error.name);
         console.error('❌ Error message:', error.message);
+        console.error('❌ Error code:', error.code);
         console.error('❌ Error stack:', error.stack);
 
         // Check if it's a MongoDB connection error
@@ -81,14 +119,25 @@ router.post('/register-profile', async (req, res) => {
             });
         } else if (error.name === 'ValidationError') {
             console.error('❌ Validation error detected');
+            console.error('❌ Validation errors:', error.errors);
             res.status(400).json({
                 message: 'Invalid user data provided',
-                success: false
+                success: false,
+                details: error.message
+            });
+        } else if (error.code === 11000) {
+            console.error('❌ Duplicate key error detected');
+            console.error('❌ Duplicate field:', error.keyValue);
+            res.status(400).json({
+                message: 'User already exists',
+                success: false,
+                details: 'A user with this email or UID already exists'
             });
         } else {
             res.status(500).json({
                 message: 'Server error while creating user profile during registration',
-                success: false
+                success: false,
+                details: error.message
             });
         }
     }
@@ -308,6 +357,34 @@ router.get('/debug-profile', requireAuth, async (req, res) => {
         });
     } catch (error) {
         console.error('Debug profile error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+// Debug endpoint to list all users in database (for debugging)
+router.get('/debug-all-users', async (req, res) => {
+    try {
+        console.log('🔍 Debug: Listing all users in database');
+
+        const allUsers = await User.find({}).select('uid email name createdAt');
+        console.log('🔍 Total users in database:', allUsers.length);
+        console.log('🔍 Users:', allUsers.map(u => ({ uid: u.uid, email: u.email, name: u.name, createdAt: u.createdAt })));
+
+        res.json({
+            success: true,
+            totalUsers: allUsers.length,
+            users: allUsers.map(u => ({
+                uid: u.uid,
+                email: u.email,
+                name: u.name,
+                createdAt: u.createdAt
+            }))
+        });
+    } catch (error) {
+        console.error('Debug all users error:', error);
         res.status(500).json({
             success: false,
             error: error.message
