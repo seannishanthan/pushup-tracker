@@ -12,7 +12,7 @@ let tokenPromise = null;
 // create an axios instance with the base URL so we can use it in our API calls without repeating the long URL
 const api = axios.create({
     baseURL: API_URL,
-    timeout: 10000, // 10 second timeout
+    timeout: 30000, // 30 second timeout for mobile networks
 });
 
 // Get fresh token with caching and error handling

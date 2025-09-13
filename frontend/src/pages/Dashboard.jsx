@@ -331,14 +331,16 @@ function Dashboard() {
 
         // Try to create the profile if it doesn't exist with retry logic
         const isMobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
-        const maxRetries = isMobile ? 3 : 2;
+        const maxRetries = isMobile ? 5 : 3; // More retries for mobile
 
         for (let attempt = 0; attempt < maxRetries; attempt++) {
           try {
             console.log(`🔄 Attempting to create missing user profile... (attempt ${attempt + 1}/${maxRetries})`);
 
             if (isMobile && attempt > 0) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
+              // Longer delays for mobile, especially for timeout recovery
+              const delay = attempt === 1 ? 3000 : 2000; // 3s for first retry, 2s for others
+              await new Promise(resolve => setTimeout(resolve, delay));
             }
 
             const createResponse = await authAPI.createProfile({
@@ -353,6 +355,12 @@ function Dashboard() {
             }
           } catch (createError) {
             console.error(`❌ Profile creation attempt ${attempt + 1} failed:`, createError);
+
+            // Log timeout errors specifically
+            if (createError.code === 'ECONNABORTED' || createError.message?.includes('timeout')) {
+              console.error('❌ Timeout error during profile creation:', createError.message);
+            }
+
             if (attempt === maxRetries - 1) {
               console.error('❌ All profile creation attempts failed');
             }

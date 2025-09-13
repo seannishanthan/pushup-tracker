@@ -98,7 +98,14 @@ function Register() {
           });
 
           // Log specific error types for debugging
-          if (profileError.response?.status === 400) {
+          if (profileError.code === 'ECONNABORTED' || profileError.message?.includes('timeout')) {
+            console.error('❌ Request timeout - Network may be slow or server unresponsive');
+            console.error('❌ Timeout details:', {
+              code: profileError.code,
+              message: profileError.message,
+              timeout: profileError.config?.timeout
+            });
+          } else if (profileError.response?.status === 400) {
             console.error('❌ 400 Bad Request - Full error data:', JSON.stringify(profileError.response.data, null, 2));
             console.error('❌ 400 Bad Request - Error message:', profileError.response.data?.message);
             console.error('❌ 400 Bad Request - Error details:', profileError.response.data?.details);
@@ -106,13 +113,22 @@ function Register() {
             console.error('❌ Database connection error');
           } else if (profileError.response?.status === 500) {
             console.error('❌ Server error:', profileError.response.data);
+          } else {
+            console.error('❌ Other error:', profileError.message);
           }
 
           if (attempt < maxRetries - 1) {
             console.log(`⏳ Waiting before retry ${attempt + 2}...`);
             // Progressive delay: longer delays for later attempts
             const baseDelay = isMobile ? 2000 : 1000;
-            const delay = baseDelay + (attempt * 1000); // Increase delay with each attempt
+            let delay = baseDelay + (attempt * 1000); // Increase delay with each attempt
+
+            // For timeout errors, add extra delay
+            if (profileError.code === 'ECONNABORTED' || profileError.message?.includes('timeout')) {
+              delay += 5000; // Add 5 seconds for timeout errors
+              console.log(`⏳ Adding extra delay for timeout error: ${delay}ms total`);
+            }
+
             await new Promise(resolve => setTimeout(resolve, delay));
           } else {
             console.error('❌ All profile creation attempts failed');
@@ -131,7 +147,14 @@ function Register() {
             }
 
             // Show specific error message to user
-            const errorMessage = profileError.response?.data?.message || 'Profile setup failed';
+            let errorMessage = 'Profile setup failed';
+
+            if (profileError.code === 'ECONNABORTED' || profileError.message?.includes('timeout')) {
+              errorMessage = 'Network timeout - please check your connection and try logging in after email verification';
+            } else if (profileError.response?.data?.message) {
+              errorMessage = profileError.response.data.message;
+            }
+
             setError(`Registration successful, but ${errorMessage.toLowerCase()}. Please try logging in after email verification.`);
           }
         }
