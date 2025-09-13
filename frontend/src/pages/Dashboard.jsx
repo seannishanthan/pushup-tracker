@@ -150,6 +150,7 @@ const WeeklyChart = ({ data, labels }) => {
 function Dashboard() {
   const { user, isVerified } = useFirebaseAuth(); // Add Firebase auth hook
   const [userName, setUserName] = useState('User'); // State for real user name
+  const [isLoading, setIsLoading] = useState(true); // Loading state for dashboard
   const [todayReps, setTodayReps] = useState(0); // State for real today's reps
   const [todayRepsData, setTodayRepsData] = useState([]); // State for sparkline data
   const [allTimeReps, setAllTimeReps] = useState(0); // State for real all-time reps
@@ -393,6 +394,9 @@ function Dashboard() {
 
       // Fetch today's reps and other data (this function handles all calculations)
       await fetchTodayReps();
+
+      // Set loading to false after all data is loaded
+      setIsLoading(false);
     };
 
     // Fetch today's reps from user sessions
@@ -718,6 +722,9 @@ function Dashboard() {
         setGoalStreak(0);
         setGoalStreakData('Start your goal streak!');
         setGoalStreakColor('red');
+      } finally {
+        // Set loading to false even if there's an error
+        setIsLoading(false);
       }
     };
 
@@ -734,6 +741,9 @@ function Dashboard() {
     if (isVerified && userName === 'User') {
       console.log('🔄 User verification status changed, refreshing profile data...');
 
+      // Set loading to true while refreshing
+      setIsLoading(true);
+
       // Add a small delay to ensure backend has processed the verification
       const refreshTimer = setTimeout(async () => {
         try {
@@ -741,6 +751,9 @@ function Dashboard() {
           console.log('✅ Profile data refreshed after verification');
         } catch (error) {
           console.error('Error refreshing profile after verification:', error);
+        } finally {
+          // Set loading to false after refresh attempt
+          setIsLoading(false);
         }
       }, 1000); // 1 second delay
 
@@ -781,6 +794,21 @@ function Dashboard() {
     }
   };
 
+
+  // Loading component
+  if (isLoading) {
+    return (
+      <div className="bg-gray-50 min-h-screen">
+        <NavBar />
+        <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
+          <div className="text-center max-w-md mx-auto px-4">
+            <div className="animate-spin rounded-full h-20 w-20 border-b-2 border-blue-600 mx-auto mb-6"></div>
+            <div className="text-2xl font-bold text-gray-900 mb-3">Loading your dashboard...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-gray-50 min-h-screen">
