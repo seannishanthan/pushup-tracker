@@ -61,13 +61,22 @@ function Register() {
 
       console.log('📧 Verification email sent');
 
-      // Create user profile in MongoDB with retry logic for mobile
+      // Create user profile in MongoDB with enhanced retry logic for mobile
       let profileCreated = false;
-      const maxRetries = 3;
+      const isMobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
+      const maxRetries = isMobile ? 5 : 3; // More retries for mobile
+
+      console.log(`📱 Mobile device detected: ${isMobile}, using ${maxRetries} retries`);
 
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
           console.log(`🔄 Creating user profile in MongoDB... (attempt ${attempt + 1}/${maxRetries})`);
+
+          // For mobile, add a small delay before each attempt to ensure network stability
+          if (isMobile && attempt > 0) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+
           await authAPI.createRegistrationProfile({
             name: formData.name,
             email: formData.email
@@ -77,11 +86,17 @@ function Register() {
           break; // Success, exit retry loop
         } catch (profileError) {
           console.error(`❌ Profile creation attempt ${attempt + 1} failed:`, profileError);
+          console.error('❌ Error details:', {
+            status: profileError.response?.status,
+            data: profileError.response?.data,
+            message: profileError.message
+          });
 
           if (attempt < maxRetries - 1) {
             console.log(`⏳ Waiting before retry ${attempt + 2}...`);
-            // Add delay between retries, longer for mobile
-            const delay = /iPhone|iPad|iPod/.test(navigator.userAgent) ? 2000 : 1000;
+            // Progressive delay: longer delays for later attempts
+            const baseDelay = isMobile ? 2000 : 1000;
+            const delay = baseDelay + (attempt * 1000); // Increase delay with each attempt
             await new Promise(resolve => setTimeout(resolve, delay));
           } else {
             console.error('❌ All profile creation attempts failed');

@@ -115,6 +115,10 @@ function EmailVerificationHandler() {
 // Component to protect routes that require authentication
 function RequireAuth({ children }) {
   const { initializing, user, isVerified, error } = useFirebaseAuth();
+  const [searchParams] = useSearchParams();
+
+  // Check if we're in the middle of email verification
+  const isVerifyingEmail = searchParams.get('mode') === 'verifyEmail' && searchParams.get('oobCode');
 
   if (initializing) {
     return (
@@ -146,6 +150,26 @@ function RequireAuth({ children }) {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  // If we're processing email verification, show loading instead of redirecting to verify page
+  if (!isVerified && isVerifyingEmail) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="animate-spin rounded-full h-20 w-20 border-b-2 border-blue-600 mx-auto mb-6"></div>
+          <div className="text-2xl font-bold text-gray-900 mb-3">Verifying your email...</div>
+          <div className="text-gray-600 mb-4">
+            <div className="mb-2">📧 Processing verification link</div>
+            <div className="mb-2">🔐 Updating your account</div>
+            <div>🚀 Preparing your dashboard</div>
+          </div>
+          <div className="text-sm text-gray-500">
+            This may take a few moments...
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!isVerified) {

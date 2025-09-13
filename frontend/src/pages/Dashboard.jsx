@@ -329,21 +329,34 @@ function Dashboard() {
       } else {
         console.log('⚠️ No name found in profile, attempting to create profile...');
 
-        // Try to create the profile if it doesn't exist
-        try {
-          console.log('🔄 Attempting to create missing user profile...');
-          const createResponse = await authAPI.createProfile({
-            name: auth.currentUser.email.split('@')[0], // Use email prefix as default name
-            email: auth.currentUser.email
-          });
+        // Try to create the profile if it doesn't exist with retry logic
+        const isMobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
+        const maxRetries = isMobile ? 3 : 2;
 
-          if (createResponse?.data?.user?.name) {
-            console.log('✅ Profile created successfully:', createResponse.data.user.name);
-            setUserName(createResponse.data.user.name);
-            return true;
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            console.log(`🔄 Attempting to create missing user profile... (attempt ${attempt + 1}/${maxRetries})`);
+
+            if (isMobile && attempt > 0) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+
+            const createResponse = await authAPI.createProfile({
+              name: auth.currentUser.email.split('@')[0], // Use email prefix as default name
+              email: auth.currentUser.email
+            });
+
+            if (createResponse?.data?.user?.name) {
+              console.log('✅ Profile created successfully:', createResponse.data.user.name);
+              setUserName(createResponse.data.user.name);
+              return true;
+            }
+          } catch (createError) {
+            console.error(`❌ Profile creation attempt ${attempt + 1} failed:`, createError);
+            if (attempt === maxRetries - 1) {
+              console.error('❌ All profile creation attempts failed');
+            }
           }
-        } catch (createError) {
-          console.error('❌ Failed to create missing profile:', createError);
         }
 
         setUserName('User');
