@@ -392,4 +392,61 @@ router.get('/debug-all-users', async (req, res) => {
     }
 });
 
+// Debug endpoint to test profile creation with specific data
+router.post('/debug-test-profile', async (req, res) => {
+    try {
+        console.log('🧪 Debug: Testing profile creation with data:', req.body);
+
+        const { name, email, uid } = req.body;
+
+        // Check for existing users
+        const existingUid = await User.findOne({ uid });
+        const existingEmail = await User.findOne({ email });
+
+        console.log('🔍 Existing UID user:', existingUid);
+        console.log('🔍 Existing email user:', existingEmail);
+
+        if (existingUid) {
+            return res.status(400).json({
+                success: false,
+                message: 'UID already exists',
+                existingUser: existingUid
+            });
+        }
+
+        if (existingEmail) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email already exists',
+                existingUser: existingEmail
+            });
+        }
+
+        // Try to create user
+        const testUser = new User({
+            uid,
+            name,
+            email,
+            dailyGoal: 50
+        });
+
+        await testUser.save();
+
+        res.json({
+            success: true,
+            message: 'Test user created successfully',
+            user: testUser.getPublicProfile()
+        });
+
+    } catch (error) {
+        console.error('🧪 Debug test profile error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            errorName: error.name,
+            errorCode: error.code
+        });
+    }
+});
+
 module.exports = router;

@@ -118,6 +118,7 @@ export const authAPI = {
     // Debug endpoints
     debugProfile: () => api.get('/auth/debug-profile'),
     debugAllUsers: () => api.get('/auth/debug-all-users'),
+    debugTestProfile: (data) => api.post('/auth/debug-test-profile', data),
 };
 
 // Pushup Sessions API

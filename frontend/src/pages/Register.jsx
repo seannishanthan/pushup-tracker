@@ -77,10 +77,15 @@ function Register() {
             await new Promise(resolve => setTimeout(resolve, 500));
           }
 
-          await authAPI.createRegistrationProfile({
+          const profileData = {
             name: formData.name,
             email: formData.email
-          });
+          };
+
+          console.log('📤 Sending profile data:', JSON.stringify(profileData, null, 2));
+          console.log('📤 Current user:', auth.currentUser?.email, auth.currentUser?.uid);
+
+          await authAPI.createRegistrationProfile(profileData);
           console.log('✅ User profile created in database during registration');
           profileCreated = true;
           break; // Success, exit retry loop
@@ -92,6 +97,17 @@ function Register() {
             message: profileError.message
           });
 
+          // Log specific error types for debugging
+          if (profileError.response?.status === 400) {
+            console.error('❌ 400 Bad Request - Full error data:', JSON.stringify(profileError.response.data, null, 2));
+            console.error('❌ 400 Bad Request - Error message:', profileError.response.data?.message);
+            console.error('❌ 400 Bad Request - Error details:', profileError.response.data?.details);
+          } else if (profileError.response?.status === 503) {
+            console.error('❌ Database connection error');
+          } else if (profileError.response?.status === 500) {
+            console.error('❌ Server error:', profileError.response.data);
+          }
+
           if (attempt < maxRetries - 1) {
             console.log(`⏳ Waiting before retry ${attempt + 2}...`);
             // Progressive delay: longer delays for later attempts
@@ -100,8 +116,23 @@ function Register() {
             await new Promise(resolve => setTimeout(resolve, delay));
           } else {
             console.error('❌ All profile creation attempts failed');
-            // Show warning to user but don't fail registration
-            setError('Registration successful, but profile setup failed. Please try logging in after email verification.');
+
+            // Debug: Try to test profile creation with debug endpoint
+            try {
+              console.log('🧪 Testing profile creation with debug endpoint...');
+              const debugResponse = await authAPI.debugTestProfile({
+                name: formData.name,
+                email: formData.email,
+                uid: auth.currentUser?.uid
+              });
+              console.log('🧪 Debug test successful:', debugResponse.data);
+            } catch (debugError) {
+              console.error('🧪 Debug test failed:', debugError.response?.data);
+            }
+
+            // Show specific error message to user
+            const errorMessage = profileError.response?.data?.message || 'Profile setup failed';
+            setError(`Registration successful, but ${errorMessage.toLowerCase()}. Please try logging in after email verification.`);
           }
         }
       }
