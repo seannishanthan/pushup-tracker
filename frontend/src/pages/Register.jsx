@@ -85,8 +85,15 @@ function Register() {
           console.log('📤 Sending profile data:', JSON.stringify(profileData, null, 2));
           console.log('📤 Current user:', auth.currentUser?.email, auth.currentUser?.uid);
 
-          await authAPI.createRegistrationProfile(profileData);
-          console.log('✅ User profile created in database during registration');
+          const profileResponse = await authAPI.createRegistrationProfile(profileData);
+
+          // Check if this is a "user already exists" response
+          if (profileResponse?.data?.message === 'User profile already exists') {
+            console.log('✅ User already exists in database - this is expected, not an error');
+          } else {
+            console.log('✅ User profile created in database during registration');
+          }
+
           profileCreated = true;
           break; // Success, exit retry loop
         } catch (profileError) {
@@ -109,6 +116,14 @@ function Register() {
             console.error('❌ 400 Bad Request - Full error data:', JSON.stringify(profileError.response.data, null, 2));
             console.error('❌ 400 Bad Request - Error message:', profileError.response.data?.message);
             console.error('❌ 400 Bad Request - Error details:', profileError.response.data?.details);
+
+            // Check if user already exists - this is not a retryable error
+            if (profileError.response?.data?.message === 'User already exists' ||
+              profileError.response?.data?.message === 'User profile already exists') {
+              console.log('✅ User already exists in database - this is expected, not an error');
+              profileCreated = true; // Mark as successful since user exists
+              break; // Exit the retry loop
+            }
           } else if (profileError.response?.status === 503) {
             console.error('❌ Database connection error');
           } else if (profileError.response?.status === 500) {

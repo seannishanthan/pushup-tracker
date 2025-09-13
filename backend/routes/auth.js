@@ -66,10 +66,11 @@ router.post('/register-profile', async (req, res) => {
         console.log('🔍 Checking for existing user profile...');
         const existingUser = await User.findOne({ uid: decodedToken.uid });
         if (existingUser) {
-            console.log('❌ Profile already exists for user:', decodedToken.uid);
-            return res.status(400).json({
+            console.log('✅ Profile already exists for user:', decodedToken.uid, '- this is expected');
+            return res.status(200).json({
                 message: 'User profile already exists',
-                success: false
+                success: true,
+                user: existingUser.getPublicProfile()
             });
         }
 

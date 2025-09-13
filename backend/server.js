@@ -34,14 +34,14 @@ app.use(cors({
     cb(null, allowed);
   },
   credentials: true,                     // ok even if you don't use cookies
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.options('*', cors());
 
 
 
-app.use(express.json({limit: '10mb'})); // before hitting any route, we want to parse the request body as JSON
+app.use(express.json({ limit: '10mb' })); // before hitting any route, we want to parse the request body as JSON
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); // let server parse URL-encoded data like form data
 
 
@@ -60,10 +60,32 @@ app.use('/api/pushups', pushupRoutes);
 // Test route
 // whenever user makes a GET request to /api/test, it will return a JSON response
 app.get('/api/test', (req, res) => {
-  res.json({ 
-    success: true, 
+  res.json({
+    success: true,
     message: 'Push-up Tracker API is running!',
     timestamp: new Date().toISOString()
+  });
+});
+
+// Uptime ping endpoint to prevent cold starts
+app.get('/api/ping', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Pong!',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage()
+  });
+});
+
+// Health check endpoint for monitoring services
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
   });
 });
 
@@ -87,10 +109,47 @@ app.use((error, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
+// Keep the server alive with connection pooling
+let server;
+
 connectDB().then(() => {
-    app.listen(PORT, () => {
-        console.log(`🚀 Server running on port ${PORT}`);
+  server = app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+    console.log(`🏓 Ping endpoint: http://localhost:${PORT}/api/ping`);
+  });
+
+  // Keep server alive with keep-alive settings
+  server.keepAliveTimeout = 65000; // 65 seconds
+  server.headersTimeout = 66000; // 66 seconds
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received, shutting down gracefully');
+  if (server) {
+    server.close(() => {
+      console.log('✅ Server closed');
+      mongoose.connection.close(false, () => {
+        console.log('✅ MongoDB connection closed');
+        process.exit(0);
+      });
     });
+  }
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 SIGINT received, shutting down gracefully');
+  if (server) {
+    server.close(() => {
+      console.log('✅ Server closed');
+      mongoose.connection.close(false, () => {
+        console.log('✅ MongoDB connection closed');
+        process.exit(0);
+      });
+    });
+  }
 });
 
 // Handle unhandled promise rejections

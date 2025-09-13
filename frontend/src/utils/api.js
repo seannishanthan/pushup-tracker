@@ -13,7 +13,26 @@ let tokenPromise = null;
 const api = axios.create({
     baseURL: API_URL,
     timeout: 30000, // 30 second timeout for mobile networks
+    // Add keep-alive headers to maintain connections
+    headers: {
+        'Connection': 'keep-alive',
+        'Keep-Alive': 'timeout=5, max=1000'
+    }
 });
+
+// Pre-warm the backend connection on app startup
+const preWarmBackend = async () => {
+    try {
+        console.log('🔥 Pre-warming backend connection...');
+        await api.get('/api/ping');
+        console.log('✅ Backend pre-warmed successfully');
+    } catch (error) {
+        console.log('⚠️ Backend pre-warm failed (this is normal on first load):', error.message);
+    }
+};
+
+// Pre-warm on module load (but don't block)
+preWarmBackend();
 
 // Get fresh token with caching and error handling
 const getAuthToken = async (forceRefresh = false) => {
