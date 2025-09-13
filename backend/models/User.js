@@ -35,14 +35,6 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: Date.now //default value is current date and time
     },
-    totalSessions: {
-        type: Number,
-        default: 0 //default value is 0
-    },
-    totalPushups: {
-        type: Number,
-        default: 0 //default value is 0
-    },
     dailyGoal: {
         type: Number,
         default: 20 //default daily goal is 20 pushups
@@ -66,8 +58,6 @@ userSchema.methods.getPublicProfile = function () {
         name: this.name,
         email: this.email,
         createdAt: this.createdAt,
-        totalSessions: this.totalSessions,
-        totalPushups: this.totalPushups,
         dailyGoal: this.dailyGoal
     };
 };

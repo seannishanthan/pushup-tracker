@@ -28,12 +28,10 @@ function EmailVerificationHandler() {
 
       if (mode === 'verifyEmail') {
         processedRef.current = true;
-        console.log('📧 Processing email verification from URL parameters');
 
         try {
           // Apply the email verification code
           await applyActionCode(auth, oobCode);
-          console.log('✅ Email verification applied successfully');
 
           // Clear URL parameters
           const newParams = new URLSearchParams(searchParams);
@@ -48,14 +46,11 @@ function EmailVerificationHandler() {
 
           // Check if user is signed in
           if (auth?.currentUser) {
-            console.log('🔄 User signed in, refreshing auth state...');
-            console.log('📱 User agent:', navigator.userAgent);
 
             // For mobile Safari, add extra delay and retry logic
             const isMobileSafari = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent);
 
             if (isMobileSafari) {
-              console.log('📱 Mobile Safari detected - using enhanced verification flow...');
               // Add extra delay for mobile Safari
               await new Promise(resolve => setTimeout(resolve, 1500));
             }
@@ -63,7 +58,6 @@ function EmailVerificationHandler() {
             await auth.currentUser.reload();
 
             // Force get a fresh ID token with the updated verification status
-            console.log('🔑 Getting fresh ID token after verification...');
             await auth.currentUser.getIdToken(true); // Force refresh
 
             // Clear token cache to ensure fresh tokens are used
@@ -71,19 +65,17 @@ function EmailVerificationHandler() {
 
             // For mobile Safari, add one more delay before navigation
             if (isMobileSafari) {
-              console.log('📱 Mobile Safari: adding final delay before navigation...');
               await new Promise(resolve => setTimeout(resolve, 1000));
             }
 
             // Redirect to dashboard
             navigate('/', { replace: true });
           } else {
-            console.log('⚠️ No user signed in, redirecting to login');
             navigate('/login?message=Email verified! Please sign in to continue.', { replace: true });
           }
 
         } catch (error) {
-          console.error('❌ Error applying verification code:', error);
+          console.error('Error applying verification code:', error.message);
 
           // Clear URL parameters
           const newParams = new URLSearchParams(searchParams);

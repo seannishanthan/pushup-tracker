@@ -45,10 +45,21 @@ app.use(express.json({ limit: '10mb' })); // before hitting any route, we want t
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); // let server parse URL-encoded data like form data
 
 
-// if we are in development mode, we want to log the requests to the console for debugging
-if (process.env.NODE_ENV === 'development') {
+// Request logging (development only)
+if (process.env.NODE_ENV !== 'production') {
   app.use((req, res, next) => {
     console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
+    next();
+  });
+}
+
+// Security headers (production)
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     next();
   });
 }
@@ -85,9 +96,24 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    environment: process.env.NODE_ENV || 'development'
   });
 });
+
+// Debug endpoints (development only)
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/api/debug/info', (req, res) => {
+    res.json({
+      environment: process.env.NODE_ENV,
+      nodeVersion: process.version,
+      platform: process.platform,
+      memory: process.memoryUsage(),
+      uptime: process.uptime(),
+      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    });
+  });
+}
 
 // If a request comes in for a route that does not exist, return 404
 app.use('*', (req, res) => {

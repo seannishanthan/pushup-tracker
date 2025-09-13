@@ -43,7 +43,6 @@ router.post('/register-profile', async (req, res) => {
         }
 
         if (name.trim().length < 2) {
-            console.log('❌ Name too short:', name);
             return res.status(400).json({
                 message: 'Name must be at least 2 characters long',
                 success: false
@@ -51,7 +50,6 @@ router.post('/register-profile', async (req, res) => {
         }
 
         if (/\s/.test(name.trim())) {
-            console.log('❌ Name contains spaces:', name);
             return res.status(400).json({
                 message: 'Name cannot contain spaces',
                 success: false
@@ -60,13 +58,10 @@ router.post('/register-profile', async (req, res) => {
 
         // Format name: capitalize first letter, lowercase rest
         const formattedName = name.trim().charAt(0).toUpperCase() + name.trim().slice(1).toLowerCase();
-        console.log('📝 Formatted name:', formattedName);
 
         // Check if user profile already exists
-        console.log('🔍 Checking for existing user profile...');
         const existingUser = await User.findOne({ uid: decodedToken.uid });
         if (existingUser) {
-            console.log('✅ Profile already exists for user:', decodedToken.uid, '- this is expected');
             return res.status(200).json({
                 message: 'User profile already exists',
                 success: true,
@@ -74,18 +69,16 @@ router.post('/register-profile', async (req, res) => {
             });
         }
 
-        // Also check if email already exists (shouldn't happen but good to log)
+        // Also check if email already exists
         const existingEmail = await User.findOne({ email: decodedToken.email });
         if (existingEmail) {
-            console.log('❌ Email already exists in database:', decodedToken.email);
             return res.status(400).json({
                 message: 'Email already registered',
                 success: false
             });
         }
 
-        // Create new user profile (without email verification requirement)
-        console.log('🔄 Creating new user profile...');
+        // Create new user profile
         const newUser = new User({
             uid: decodedToken.uid,
             name: formattedName || decodedToken.email.split('@')[0],
@@ -93,11 +86,7 @@ router.post('/register-profile', async (req, res) => {
             dailyGoal: 50
         });
 
-        console.log('💾 Saving user to database...');
         await newUser.save();
-        console.log('✅ Registration profile created successfully for user:', decodedToken.uid, 'with name:', newUser.name);
-        console.log('📋 Full user profile:', newUser.toObject());
-        console.log('📋 User ID:', newUser._id);
 
         res.status(201).json({
             success: true,
@@ -105,30 +94,27 @@ router.post('/register-profile', async (req, res) => {
             message: 'User profile created successfully during registration'
         });
     } catch (error) {
-        console.error('❌ Registration profile creation error:', error);
-        console.error('❌ Error name:', error.name);
-        console.error('❌ Error message:', error.message);
-        console.error('❌ Error code:', error.code);
-        console.error('❌ Error stack:', error.stack);
+        // Log error for monitoring (production logging)
+        console.error('Registration profile creation error:', {
+            error: error.message,
+            code: error.code,
+            name: error.name,
+            uid: decodedToken?.uid
+        });
 
-        // Check if it's a MongoDB connection error
+        // Handle different error types
         if (error.name === 'MongoNetworkError' || error.name === 'MongoTimeoutError') {
-            console.error('❌ MongoDB connection error detected');
             res.status(503).json({
                 message: 'Database connection error. Please try again.',
                 success: false
             });
         } else if (error.name === 'ValidationError') {
-            console.error('❌ Validation error detected');
-            console.error('❌ Validation errors:', error.errors);
             res.status(400).json({
                 message: 'Invalid user data provided',
                 success: false,
                 details: error.message
             });
         } else if (error.code === 11000) {
-            console.error('❌ Duplicate key error detected');
-            console.error('❌ Duplicate field:', error.keyValue);
             res.status(400).json({
                 message: 'User already exists',
                 success: false,
@@ -147,9 +133,6 @@ router.post('/register-profile', async (req, res) => {
 // Create user profile after Firebase registration
 router.post('/profile', requireAuth, async (req, res) => {
     try {
-        console.log('👤 Profile creation request for user:', req.user.uid);
-        console.log('👤 Request body:', req.body);
-
         const { name, email } = req.body;
 
         // Format name: capitalize first letter, lowercase rest
@@ -158,7 +141,6 @@ router.post('/profile', requireAuth, async (req, res) => {
         // Check if user profile already exists
         const existingUser = await User.findOne({ uid: req.user.uid });
         if (existingUser) {
-            console.log('❌ Profile already exists for user:', req.user.uid);
             return res.status(400).json({
                 message: 'User profile already exists',
                 success: false

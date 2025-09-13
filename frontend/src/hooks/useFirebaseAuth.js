@@ -36,7 +36,6 @@ export function useFirebaseAuth() {
         reloadTimeoutRef.current = setTimeout(async () => {
             try {
                 await firebaseUser.reload();
-                console.log('✅ User reloaded successfully');
             } catch (error) {
                 console.error('❌ Error reloading user:', error);
                 setError('Failed to refresh user data');
@@ -52,10 +51,8 @@ export function useFirebaseAuth() {
             return;
         }
 
-        console.log('🔐 Setting up Firebase auth listener');
 
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-            console.log('🔄 Auth state changed:', firebaseUser ? `User: ${firebaseUser.email}` : 'No user');
 
             if (firebaseUser) {
                 // Only reload if user is not verified to get latest status
@@ -74,7 +71,6 @@ export function useFirebaseAuth() {
         });
 
         return () => {
-            console.log('🧹 Cleaning up auth listener');
             unsubscribe();
             if (reloadTimeoutRef.current) {
                 clearTimeout(reloadTimeoutRef.current);

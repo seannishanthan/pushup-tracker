@@ -50,8 +50,6 @@ function Register() {
         formData.password
       );
 
-      console.log('✅ User created successfully:', userCredential.user.uid);
-
       // Send email verification
       const continueUrl = import.meta.env.VITE_FB_CONTINUE_URL || `${window.location.origin}/`;
 
@@ -59,18 +57,13 @@ function Register() {
         url: continueUrl
       });
 
-      console.log('📧 Verification email sent');
-
       // Create user profile in MongoDB with enhanced retry logic for mobile
       let profileCreated = false;
       const isMobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
       const maxRetries = isMobile ? 5 : 3; // More retries for mobile
 
-      console.log(`📱 Mobile device detected: ${isMobile}, using ${maxRetries} retries`);
-
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-          console.log(`🔄 Creating user profile in MongoDB... (attempt ${attempt + 1}/${maxRetries})`);
 
           // For mobile, add a small delay before each attempt to ensure network stability
           if (isMobile && attempt > 0) {
@@ -82,58 +75,28 @@ function Register() {
             email: formData.email
           };
 
-          console.log('📤 Sending profile data:', JSON.stringify(profileData, null, 2));
-          console.log('📤 Current user:', auth.currentUser?.email, auth.currentUser?.uid);
-
           const profileResponse = await authAPI.createRegistrationProfile(profileData);
 
-          // Check if this is a "user already exists" response
-          if (profileResponse?.data?.message === 'User profile already exists') {
-            console.log('✅ User already exists in database - this is expected, not an error');
-          } else {
-            console.log('✅ User profile created in database during registration');
-          }
-
+          // Profile creation successful
           profileCreated = true;
           break; // Success, exit retry loop
         } catch (profileError) {
-          console.error(`❌ Profile creation attempt ${attempt + 1} failed:`, profileError);
-          console.error('❌ Error details:', {
+          // Log error for monitoring (production logging)
+          console.error('Profile creation error:', {
+            attempt: attempt + 1,
             status: profileError.response?.status,
-            data: profileError.response?.data,
-            message: profileError.message
+            message: profileError.message,
+            code: profileError.code
           });
 
-          // Log specific error types for debugging
-          if (profileError.code === 'ECONNABORTED' || profileError.message?.includes('timeout')) {
-            console.error('❌ Request timeout - Network may be slow or server unresponsive');
-            console.error('❌ Timeout details:', {
-              code: profileError.code,
-              message: profileError.message,
-              timeout: profileError.config?.timeout
-            });
-          } else if (profileError.response?.status === 400) {
-            console.error('❌ 400 Bad Request - Full error data:', JSON.stringify(profileError.response.data, null, 2));
-            console.error('❌ 400 Bad Request - Error message:', profileError.response.data?.message);
-            console.error('❌ 400 Bad Request - Error details:', profileError.response.data?.details);
-
-            // Check if user already exists - this is not a retryable error
-            if (profileError.response?.data?.message === 'User already exists' ||
-              profileError.response?.data?.message === 'User profile already exists') {
-              console.log('✅ User already exists in database - this is expected, not an error');
-              profileCreated = true; // Mark as successful since user exists
-              break; // Exit the retry loop
-            }
-          } else if (profileError.response?.status === 503) {
-            console.error('❌ Database connection error');
-          } else if (profileError.response?.status === 500) {
-            console.error('❌ Server error:', profileError.response.data);
-          } else {
-            console.error('❌ Other error:', profileError.message);
+          // Check if user already exists - this is not a retryable error
+          if (profileError.response?.data?.message === 'User already exists' ||
+            profileError.response?.data?.message === 'User profile already exists') {
+            profileCreated = true; // Mark as successful since user exists
+            break; // Exit the retry loop
           }
 
           if (attempt < maxRetries - 1) {
-            console.log(`⏳ Waiting before retry ${attempt + 2}...`);
             // Progressive delay: longer delays for later attempts
             const baseDelay = isMobile ? 2000 : 1000;
             let delay = baseDelay + (attempt * 1000); // Increase delay with each attempt
@@ -141,25 +104,11 @@ function Register() {
             // For timeout errors, add extra delay
             if (profileError.code === 'ECONNABORTED' || profileError.message?.includes('timeout')) {
               delay += 5000; // Add 5 seconds for timeout errors
-              console.log(`⏳ Adding extra delay for timeout error: ${delay}ms total`);
             }
 
             await new Promise(resolve => setTimeout(resolve, delay));
           } else {
-            console.error('❌ All profile creation attempts failed');
-
-            // Debug: Try to test profile creation with debug endpoint
-            try {
-              console.log('🧪 Testing profile creation with debug endpoint...');
-              const debugResponse = await authAPI.debugTestProfile({
-                name: formData.name,
-                email: formData.email,
-                uid: auth.currentUser?.uid
-              });
-              console.log('🧪 Debug test successful:', debugResponse.data);
-            } catch (debugError) {
-              console.error('🧪 Debug test failed:', debugError.response?.data);
-            }
+            // All attempts failed
 
             // Show specific error message to user
             let errorMessage = 'Profile setup failed';

@@ -199,9 +199,7 @@ function Dashboard() {
 
   // Function to calculate goal streak
   const calculateGoalStreak = (sessions, goalValue) => {
-    console.log('🎯 calculateGoalStreak called with:', sessions?.length, 'sessions, goal:', goalValue);
     if (!sessions || sessions.length === 0 || !goalValue) {
-      console.log('❌ No sessions or goal value, setting streak to 0');
       setGoalStreak(0);
       setGoalStreakData('Start your goal streak!');
       setGoalStreakColor('red');
@@ -224,10 +222,6 @@ function Dashboard() {
     const todayGoalReps = dailyTotalsForGoal[todayGoalDateString] || 0;
     const metGoalToday = todayGoalReps >= goalValue;
 
-    console.log('📅 Today date string:', todayGoalDateString);
-    console.log('🎯 Today goal reps:', todayGoalReps);
-    console.log('✅ Met goal today:', metGoalToday);
-    console.log('📊 Daily totals:', dailyTotalsForGoal);
 
     // Calculate goal streak by going backwards from today (or yesterday if goal not met today)
     let currentGoalStreak = 0;
@@ -268,66 +262,41 @@ function Dashboard() {
     setGoalStreakData(goalStreakMessage);
     setGoalStreakColor(goalStreakColor);
 
-    console.log('Goal streak recalculated with goal:', goalValue);
-    console.log('Current goal streak:', currentGoalStreak);
-    console.log('Goal streak message:', goalStreakMessage);
   };
 
   // Fetch user name with retry logic for mobile Safari
   const fetchUserNameWithRetry = async (maxRetries = 1) => {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        console.log(`📋 Fetching user profile... (attempt ${attempt + 1}/${maxRetries})`);
         const success = await fetchUserName(attempt);
         if (success) {
-          console.log('✅ User profile loaded successfully');
           return;
         }
       } catch (error) {
         console.error(`❌ Attempt ${attempt + 1} failed:`, error);
         if (attempt < maxRetries - 1) {
-          console.log(`⏳ Waiting before retry ${attempt + 2}...`);
           await new Promise(resolve => setTimeout(resolve, 1500));
         }
       }
     }
-    console.log('⚠️ All attempts failed, using default name');
     setUserName('User');
   };
 
   // Fetch the user name and daily goal from API
   const fetchUserName = async (retryCount = 0) => {
     try {
-      console.log('📋 Fetching user profile... (attempt', retryCount + 1, ')');
       const userResponse = await authAPI.getProfile();
-
-      console.log('📋 Full API response:', userResponse);
-      console.log('📋 Response data:', userResponse?.data);
-      console.log('📋 User data:', userResponse?.data?.user);
-
-      // Debug: Also try the debug endpoint
-      try {
-        const debugResponse = await authAPI.debugProfile();
-        console.log('🔍 Debug profile response:', debugResponse);
-      } catch (debugError) {
-        console.log('🔍 Debug profile failed:', debugError);
-      }
 
       // The correct response structure is: Axios wraps it as { data: { success: true, user: { name, email, ... } } }
       let name = null;
       if (userResponse?.data?.user?.name) {
         name = userResponse.data.user.name;
-        console.log('✅ Found name in response:', name);
-      } else {
-        console.log('⚠️ No name found in response');
-        console.log('📋 Available user fields:', Object.keys(userResponse?.data?.user || {}));
       }
 
       if (name) {
-        console.log('✅ User name loaded:', name);
         setUserName(name);
+        return true;
       } else {
-        console.log('⚠️ No name found in profile, attempting to create profile...');
 
         // Try to create the profile if it doesn't exist with retry logic
         const isMobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
@@ -335,7 +304,6 @@ function Dashboard() {
 
         for (let attempt = 0; attempt < maxRetries; attempt++) {
           try {
-            console.log(`🔄 Attempting to create missing user profile... (attempt ${attempt + 1}/${maxRetries})`);
 
             if (isMobile && attempt > 0) {
               // Longer delays for mobile, especially for timeout recovery
@@ -349,21 +317,12 @@ function Dashboard() {
             });
 
             if (createResponse?.data?.user?.name) {
-              console.log('✅ Profile created successfully:', createResponse.data.user.name);
               setUserName(createResponse.data.user.name);
               return true;
             }
           } catch (createError) {
-            console.error(`❌ Profile creation attempt ${attempt + 1} failed:`, createError);
-
-            // Log timeout errors specifically
-            if (createError.code === 'ECONNABORTED' || createError.message?.includes('timeout')) {
-              console.error('❌ Timeout error during profile creation:', createError.message);
-            }
-
-            if (attempt === maxRetries - 1) {
-              console.error('❌ All profile creation attempts failed');
-            }
+            // Log error for monitoring
+            console.error('Profile creation error:', createError.message);
           }
         }
 
@@ -373,34 +332,28 @@ function Dashboard() {
 
       // Get daily goal from user profile
       if (userResponse?.data?.user?.dailyGoal) {
-        console.log('✅ Daily goal loaded:', userResponse.data.user.dailyGoal);
         setDailyGoal(userResponse.data.user.dailyGoal);
       } else {
         // If user doesn't have a daily goal set, use default
-        console.log('⚠️ No daily goal found, using default: 50');
         setDailyGoal(50);
       }
 
       return true; // Return true to indicate success
     } catch (err) {
-      console.error('❌ Error fetching user profile:', err);
-      console.error('Response status:', err.response?.status);
-      console.error('Response data:', err.response?.data);
+      // Log error for monitoring
+      console.error('Error fetching user profile:', err.message);
 
       // If it's a 403 error and we haven't retried too many times, try again
       if (err.response?.status === 403 && retryCount < 2) {
-        console.log('🔄 403 error - token may not have propagated yet, retrying...');
-
         // Force refresh token and clear cache
         if (auth?.currentUser) {
           try {
             await auth.currentUser.getIdToken(true);
             clearTokenCache();
-            console.log('🔑 Refreshed token, retrying in 2 seconds...');
             await new Promise(resolve => setTimeout(resolve, 2000));
             return fetchUserName(retryCount + 1);
           } catch (tokenError) {
-            console.error('❌ Error refreshing token:', tokenError);
+            console.error('Error refreshing token:', tokenError.message);
           }
         }
       }

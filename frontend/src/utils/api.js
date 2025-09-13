@@ -55,10 +55,9 @@ const getAuthToken = async (forceRefresh = false) => {
         try {
             const token = await auth.currentUser.getIdToken(forceRefresh);
             tokenCache = token;
-            console.log('🔑 Token obtained successfully');
             return token;
         } catch (error) {
-            console.error('❌ Failed to get Firebase ID token:', error);
+            console.error('Failed to get Firebase ID token:', error.message);
             tokenCache = null;
             throw error;
         } finally {
