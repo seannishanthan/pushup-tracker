@@ -600,16 +600,21 @@ function Session() {
         const lowAnkles = ankleVis.filter(v => v < 0.5).length;
         const lowUpperBody = upperBodyVis.filter(v => v < 0.5).length;
 
+        // Since user is sideways, we need at least 1 knee and 1 ankle visible
+        const visibleKnees = kneeVis.filter(v => v >= 0.5).length;
+        const visibleAnkles = ankleVis.filter(v => v >= 0.5).length;
+
         if (visibility < 50) {
             return "Move further back to get your full body in frame";
         }
 
-        if (lowKnees > 0) {
-            return `Bring your ${lowKnees === 1 ? 'knee' : 'knees'} within the frame`;
+        // Check if we have the minimum required landmarks for sideways positioning
+        if (visibleKnees === 0) {
+            return "Bring your knee within the frame";
         }
 
-        if (lowAnkles > 0) {
-            return `Bring your ${lowAnkles === 1 ? 'ankle' : 'ankles'} within the frame`;
+        if (visibleAnkles === 0) {
+            return "Bring your ankle within the frame";
         }
 
         if (lowUpperBody > 2) {
