@@ -58,18 +58,12 @@ function Register() {
         url: continueUrl
       });
 
-      // Create user profile in MongoDB with enhanced retry logic for mobile
+      // Create user profile in MongoDB
       let profileCreated = false;
-      const isMobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
-      const maxRetries = isMobile ? 5 : 3; // More retries for mobile
+      const maxRetries = 3;
 
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
-
-          // For mobile, add a small delay before each attempt to ensure network stability
-          if (isMobile && attempt > 0) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
 
           const profileData = {
             name: formData.name,
@@ -99,7 +93,7 @@ function Register() {
 
           if (attempt < maxRetries - 1) {
             // Progressive delay: longer delays for later attempts
-            const baseDelay = isMobile ? 2000 : 1000;
+            const baseDelay = 1000;
             let delay = baseDelay + (attempt * 1000); // Increase delay with each attempt
 
             // For timeout errors, add extra delay

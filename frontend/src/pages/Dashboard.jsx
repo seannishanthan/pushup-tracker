@@ -264,7 +264,7 @@ function Dashboard() {
 
   };
 
-  // Fetch user name with retry logic for mobile Safari
+  // Fetch user name with retry logic
   const fetchUserNameWithRetry = async (maxRetries = 1) => {
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
@@ -298,18 +298,11 @@ function Dashboard() {
         return true;
       } else {
 
-        // Try to create the profile if it doesn't exist with retry logic
-        const isMobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent);
-        const maxRetries = isMobile ? 5 : 3; // More retries for mobile
+        // Try to create the profile if it doesn't exist
+        const maxRetries = 3;
 
         for (let attempt = 0; attempt < maxRetries; attempt++) {
           try {
-
-            if (isMobile && attempt > 0) {
-              // Longer delays for mobile, especially for timeout recovery
-              const delay = attempt === 1 ? 3000 : 2000; // 3s for first retry, 2s for others
-              await new Promise(resolve => setTimeout(resolve, delay));
-            }
 
             const createResponse = await authAPI.createProfile({
               name: auth.currentUser.email.split('@')[0], // Use email prefix as default name
@@ -399,18 +392,13 @@ function Dashboard() {
       };
       setCurrentDate(today.toLocaleDateString('en-US', options));
 
-      // For mobile Safari, add extra delay and retry logic
-      const isMobileSafari = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent);
-      if (isMobileSafari && auth?.currentUser?.emailVerified) {
-        console.log('📱 Mobile Safari detected - adding extra delay for token propagation...');
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Longer delay for mobile
-      } else if (auth?.currentUser?.emailVerified) {
-        console.log('⏳ Waiting for token propagation after verification...');
+      // Add a small delay for token propagation after verification
+      if (auth?.currentUser?.emailVerified) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
 
-      // Fetch the user name and daily goal from API with retry logic for mobile
-      await fetchUserNameWithRetry(isMobileSafari ? 3 : 1);
+      // Fetch the user name and daily goal from API
+      await fetchUserNameWithRetry(1);
 
       // Fetch today's reps and other data (this function handles all calculations)
       await fetchTodayReps();
@@ -782,24 +770,6 @@ function Dashboard() {
     }
   }, [user, isVerified, userName]);
 
-  // Mobile Safari fallback: periodically retry loading profile if still showing "User"
-  useEffect(() => {
-    const isMobileSafari = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent);
-
-    if (isMobileSafari && user && isVerified && userName === 'User' && !isLoading) {
-      console.log('📱 Mobile Safari fallback: retrying profile load...');
-
-      const fallbackTimer = setTimeout(async () => {
-        try {
-          await fetchUserName(0);
-        } catch (error) {
-          console.error('❌ Fallback retry failed:', error);
-        }
-      }, 3000); // 3 second delay
-
-      return () => clearTimeout(fallbackTimer);
-    }
-  }, [user, isVerified, userName, isLoading]);
 
   const handleEditGoal = async () => {
     const newGoal = prompt('Enter your new daily goal:', dailyGoal.toString());

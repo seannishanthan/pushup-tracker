@@ -46,15 +46,6 @@ function EmailVerificationHandler() {
 
           // Check if user is signed in
           if (auth?.currentUser) {
-
-            // For mobile Safari, add extra delay and retry logic
-            const isMobileSafari = /iPhone|iPad|iPod/.test(navigator.userAgent) && /Safari/.test(navigator.userAgent);
-
-            if (isMobileSafari) {
-              // Add extra delay for mobile Safari
-              await new Promise(resolve => setTimeout(resolve, 1500));
-            }
-
             await auth.currentUser.reload();
 
             // Force get a fresh ID token with the updated verification status
@@ -62,11 +53,6 @@ function EmailVerificationHandler() {
 
             // Clear token cache to ensure fresh tokens are used
             clearTokenCache();
-
-            // For mobile Safari, add one more delay before navigation
-            if (isMobileSafari) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
 
             // Redirect to dashboard
             navigate('/', { replace: true });
