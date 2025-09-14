@@ -1,7 +1,8 @@
 <h1 align="center"><b>💪 Pushup Tracker</b></h1>
 
 <p align="center">
-  <b>Try It Out:</b> <a href="https://pushup-tracker-3hz7.onrender.com">https://pushup-tracker-3hz7.onrender.com</a>
+  <b>Try It Out Yourself:</b> <a href="https://pushup-tracker-3hz7.onrender.com">https://pushup-tracker-3hz7.onrender.com</a>
+  <b>Video Demo:</b> <a href="https://youtu.be/h7zB7I_5Dz4">https://youtu.be/h7zB7I_5Dz4</a>
 </p>
 
 <p>
